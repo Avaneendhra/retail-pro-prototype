@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
+import { createHashRouter, RouterProvider, Navigate } from "react-router-dom";
 import "./index.css";
 import "react-datepicker/dist/react-datepicker.css";
 import { CartProvider } from "./context/CartContext";
@@ -32,7 +32,7 @@ import ReportGenerator from "./components/reports/summary/ReportGenerator";
 import SalesReportText from './components/reports/text/SalesReportText'; // <-- Was missing this import
 
 // --- Define Router Structure ---
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     element: <App />,
     children: [
