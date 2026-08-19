@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* --- 1. Light Mode Default --- */
+  body {
+    @apply font-sans text-gray-900 bg-gray-100; /* Light BG, Dark Text */
+    min-height: 100vh;
+  }
+
+  /* --- 2. Dark Mode Styles --- */
+  .dark body {
+    @apply text-gray-200; /* Dark BG, Light Text */
+    background-color: #000;
+    background-image: radial-gradient(circle at 20% 20%, theme(colors.gray.950), theme(colors.black));
+  }
+
+  /* --- 3. Table Styles (Theme-Aware) --- */
+  .table {
+    @apply w-full min-w-[640px];
+  }
+  .table th {
+    @apply p-4 text-left text-xs font-medium uppercase tracking-wider;
+    @apply text-gray-500 bg-gray-50; /* Light */
+    @apply dark:text-gray-400 dark:bg-gray-800/50; /* Dark */
+  }
+  .table td {
+    @apply p-4 whitespace-nowrap text-sm;
+    @apply text-gray-800 border-b border-gray-200; /* Light */
+    @apply dark:text-gray-200 dark:border-gray-800; /* Dark */
+  }
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table tbody tr {
+    @apply transition-colors;
+  }
+  .table tbody tr:hover {
+    @apply bg-gray-100/50; /* Light */
+    @apply dark:bg-gray-800/60; /* Dark */
+  }
+
+  /* --- 4. NavLink Styles (Theme-Aware) --- */
+  .nav-link {
+    @apply px-3 py-2 rounded-md text-sm font-medium;
+    @apply text-gray-600 hover:bg-gray-200 hover:text-gray-900; /* Light */
+    @apply dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white; /* Dark */
+    @apply transition-colors;
+  }
+  .nav-link.active {
+    @apply bg-gray-200 text-gray-900; /* Light */
+    @apply dark:bg-gray-900 dark:text-white; /* Dark */
+  }
+}
+
+/* --- 5. Card Styles (Theme-Aware) --- */
+.card {
+  @apply bg-white border border-gray-200 rounded-2xl shadow-lg; /* Light */
+  @apply dark:bg-gray-900/70 dark:backdrop-blur-xl dark:border-gray-800 dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]; /* Dark */
+  @apply transition-all duration-300 ease-out;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  @apply shadow-xl; /* Light */
+  @apply dark:shadow-[0_8px_25px_rgba(0,255,200,0.1)] dark:border-gray-700/80; /* Dark */
+}
+
+.card-title {
+  @apply font-display text-xl font-semibold tracking-wide mb-4;
+  @apply text-gray-900; /* Light */
+  @apply dark:text-white; /* Dark */
+}
+
+/* --- 6. Button Styles (Remain the same, they are context-agnostic) --- */
+.button-primary {
+  @apply bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold
+         hover:bg-blue-700 focus:outline-none focus:ring-2
+         focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900
+         transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.button-secondary {
+  @apply bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium
+         hover:bg-gray-300 focus:outline-none focus:ring-2
+         focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-100
+         dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 dark:focus:ring-offset-gray-900
+         transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* --- 7. Form Input Styles (Theme-Aware) --- */
+/* RENAMED from .form-input-dark */
+.form-input {
+  @apply w-full p-3 pl-11 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-500; /* Light */
+  @apply dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:placeholder-gray-500; /* Dark */
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply transition-all duration-300;
+  @apply disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed; /* Light Disabled */
+  @apply dark:disabled:bg-gray-900 dark:disabled:text-gray-500; /* Dark Disabled */
+}
+
+/* Input without icon */
+.form-input-no-icon {
+  @apply w-full p-3 bg-gray-100 border border-gray-300 rounded-lg placeholder-gray-500; /* Light */
+  @apply dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:placeholder-gray-500; /* Dark */
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  @apply transition-all duration-300;
+}
+
+/* Auth page social button */
+.social-button {
+  @apply w-full flex items-center justify-center gap-3 px-4 py-2.5 border rounded-lg;
+  @apply text-gray-700 bg-white hover:bg-gray-50 border-gray-300; /* Light */
+  @apply dark:text-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:border-gray-700; /* Dark */
+  @apply transition-all duration-300;
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900;
+}
+
+/* --- 8. Misc Styles (Theme-Aware) --- */
+.progress-bar-container {
+  @apply w-full rounded-full h-2 overflow-hidden;
+  @apply bg-gray-200; /* Light */
+  @apply dark:bg-gray-700/50; /* Dark */
+}
+.progress-bar {
+  @apply h-2 rounded-full bg-gradient-to-r from-blue-500 via-cyan-400 to-green-400;
+}
+
+.custom-scrollbar::-webkit-scrollbar { @apply w-1.5; }
+.custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-gray-400 dark:bg-gray-600 rounded-full; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-gray-500 dark:bg-gray-500; }
+
+.shadow-glow {
+  @apply dark:shadow-[0_0_15px_rgba(34,197,94,0.4)];
+}
+
+/* Dropdown text color */
+select option {
+  @apply bg-white text-black; /* Light */
+  @apply dark:bg-gray-900 dark:text-white; /* Dark */
+}
+
+/* --- 9. Datepicker (Theme-Aware) --- */
+.react-datepicker-wrapper { @apply w-full; }
+.react-datepicker-popper { @apply z-50; }
+
+/* Main calendar container */
+.react-datepicker {
+  @apply font-sans text-sm shadow-lg;
+  @apply bg-white border-gray-200 border rounded-lg; /* Light */
+  @apply dark:bg-gray-900 dark:border-gray-700 dark:shadow-[0_20px_40px_rgba(0,0,0,0.4)]; /* Dark */
+}
+.react-datepicker__triangle { @apply hidden; }
+
+/* Header */
+.react-datepicker__header {
+  @apply border-b-0 rounded-t-lg pt-3;
+  @apply bg-gray-50; /* Light */
+  @apply dark:bg-gray-800/50 dark:border-gray-700; /* Dark */
+}
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  @apply font-semibold;
+  @apply text-gray-900; /* Light */
+  @apply dark:text-gray-200; /* Dark */
+}
+.react-datepicker__day-name {
+  @apply text-gray-500; /* Light */
+  @apply dark:text-gray-400; /* Dark */
+}
+
+/* Day cells */
+.react-datepicker__day {
+  @apply rounded-full;
+  @apply text-gray-800; /* Light */
+  @apply dark:text-gray-300; /* Dark */
+}
+.react-datepicker__day:hover {
+  @apply rounded-full;
+  @apply bg-gray-200; /* Light */
+  @apply dark:bg-gray-700; /* Dark */
+}
+.react-datepicker__day--selected,
+.react-datepicker__day--in-range {
+  @apply bg-blue-600 text-white rounded-full font-semibold;
+  @apply dark:bg-cyan-500 dark:text-black; /* Dark */
+}
+.react-datepicker__day--keyboard-selected {
+  @apply bg-blue-700 rounded-full;
+  @apply dark:bg-cyan-600; /* Dark */
+}
+.react-datepicker__day--disabled {
+  @apply text-gray-400; /* Light */
+  @apply dark:text-gray-600; /* Dark */
+}
+
+/* Navigation */
+.react-datepicker__navigation-icon::before {
+  @apply border-gray-600; /* Light */
+  @apply dark:border-gray-300; /* Dark */
+}
