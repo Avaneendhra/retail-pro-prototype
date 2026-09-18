@@ -29,7 +29,8 @@ import CustomerHistory from './components/customers/CustomerHistory';
 import ProfilePage from "./components/profile/ProfilePage";
 import CheckoutPage from "./components/checkout/CheckoutPage";
 import ReportGenerator from "./components/reports/summary/ReportGenerator";
-import SalesReportText from './components/reports/text/SalesReportText'; // <-- Was missing this import
+import SalesReportText from './components/reports/text/SalesReportText';
+import BarcodeScanner from './components/scanner/BarcodeScanner';
 
 // --- Define Router Structure ---
 const router = createHashRouter([
@@ -57,6 +58,7 @@ const router = createHashRouter([
           { path: "/dashboard", element: <AnalyticsDashboard /> },
           { path: "/profile", element: <ProfilePage /> },
           { path: "/checkout", element: <CheckoutPage /> },
+          { path: "/scan", element: <BarcodeScanner /> },
 
           // --- ALL PrivateRoute WRAPPERS RESTORED ---
           { path: "/products", element: <PrivateRoute roles={['OWNER', 'MANAGER']}><ProductList /></PrivateRoute> },

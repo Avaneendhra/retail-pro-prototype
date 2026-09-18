@@ -200,3 +200,106 @@ select option {
   @apply border-gray-600; /* Light */
   @apply dark:border-gray-300; /* Dark */
 }
+
+/* --- 10. Mobile Bottom Navigation --- */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 4.5rem;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  @apply bg-white dark:bg-gray-800;
+  @apply border-t border-gray-200 dark:border-gray-700;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.dark .mobile-bottom-nav {
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  position: relative;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.2s ease;
+  padding-top: 0.5rem;
+}
+
+.mobile-bottom-nav-item:active {
+  transform: scale(0.9);
+}
+
+.mobile-bottom-nav-label {
+  font-size: 0.625rem;
+  margin-top: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.mobile-bottom-nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2rem;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  @apply bg-blue-500;
+}
+
+/* Scan button in center */
+.scan-button-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-button {
+  position: absolute;
+  bottom: 0.75rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  transition: all 0.3s ease;
+}
+
+.scan-button:active {
+  transform: scale(0.92);
+}
+
+.scan-button-active {
+  background: linear-gradient(135deg, #2563eb, #0891b2);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.6);
+}
+
+/* --- 11. Animate In --- */
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-in {
+  animation: animate-in 0.35s ease-out;
+}

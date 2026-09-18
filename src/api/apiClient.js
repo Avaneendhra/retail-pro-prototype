@@ -24,13 +24,44 @@ api.defaults.adapter = async (config) => {
   };
 
   const url = config.url || '';
+  const method = (config.method || 'get').toLowerCase();
 
+  // Analytics
   if (url.includes('/api/analytics/daily')) return response(analytics.daily);
   if (url.includes('/api/analytics/monthly')) return response(analytics.monthly);
   if (url.includes('/api/analytics/top-products')) return response(analytics.topProducts);
   if (url.includes('/api/analytics/revenue-trend')) return response(analytics.revenueTrend);
   if (url.includes('/api/analytics/report')) return response(analytics);
-  
+
+  // Product by barcode lookup
+  const barcodeMatch = url.match(/\/api\/products\/barcode\/(.+)/);
+  if (barcodeMatch) {
+    const barcode = barcodeMatch[1];
+    const found = products.find(p => p.barcode === barcode);
+    if (found) return response(found);
+    return new Promise((_, reject) => {
+      setTimeout(() => reject({ response: { status: 404, data: { error: 'Product not found' } } }), 200);
+    });
+  }
+
+  // Single product by ID
+  const productIdMatch = url.match(/\/api\/products\/([^/]+)$/);
+  if (productIdMatch && method === 'get') {
+    const id = productIdMatch[1];
+    const found = products.find(p => p.productId === id || p.id === id);
+    if (found) return response(found);
+    return response({});
+  }
+
+  // POST handlers (create/update operations)
+  if (method === 'post') {
+    if (url.includes('/api/products')) return response({ success: true, message: 'Product saved' });
+    if (url.includes('/api/bills')) return response({ success: true, message: 'Bill created' });
+    if (url.includes('/api/customers')) return response({ success: true, message: 'Customer saved' });
+    if (url.includes('/api/users')) return response({ success: true, message: 'User created' });
+  }
+
+  // GET list endpoints
   if (url.includes('/api/products')) return response(products);
   if (url.includes('/api/customers')) return response(customers);
   if (url.includes('/api/users')) return response(users);
