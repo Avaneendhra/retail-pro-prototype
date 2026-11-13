@@ -3,6 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import Tesseract from 'tesseract.js';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from 'react-i18next';
 
 /* ── helpers ── */
 const extractPrice = (text) => {
@@ -41,6 +42,7 @@ const generateId = () => 'P' + Date.now().toString(36).toUpperCase() + Math.rand
 export default function AddStock() {
   const { addProduct, findByBarcode } = useInventory();
   const { showToast } = useToast();
+  const { t } = useTranslation();
 
   const [mode, setMode] = useState('ai');          // 'ai' | 'barcode'
   const [scanning, setScanning] = useState(false);
@@ -82,7 +84,7 @@ export default function AddStock() {
       }
       setScanning(true);
     } catch {
-      showToast('Camera access denied. Please allow camera permission.', 'error');
+      showToast(t('addStock.errCamera'), 'error');
     }
   };
 
@@ -112,7 +114,7 @@ export default function AddStock() {
       const price = extractPrice(text);
 
       if (!name) {
-        showToast('Could not read product name. Try a clearer angle.', 'error');
+        showToast(t('addStock.errRead'), 'error');
         setProcessing(false);
         return;
       }
@@ -127,11 +129,11 @@ export default function AddStock() {
       };
 
       const res = addProduct(product);
-      showToast(`Added "${name}" (₹${price}) to inventory`, 'success');
+      showToast(t('addStock.toastAdded', { name }), 'success');
       setRecentAdds(prev => [{ name, price, qty: 1, action: res.action, time: Date.now() }, ...prev.slice(0, 14)]);
       setLastExtracted({ name, price, rawText: text });
     } catch {
-      showToast('Could not read the label. Try better lighting.', 'error');
+      showToast(t('addStock.errRead'), 'error');
     }
     setProcessing(false);
   }, [addProduct, showToast]);
@@ -153,7 +155,7 @@ export default function AddStock() {
         const existing = findByBarcode(decodedText);
         if (existing) {
           addProduct({ ...existing, quantity: 1 });
-          showToast(`+1 "${existing.name}" added to stock`, 'success');
+          showToast(t('addStock.toastPlusOne', { name: existing.name }), 'success');
           setRecentAdds(prev => [{ name: existing.name, price: existing.price, qty: 1, action: 'updated', time: Date.now() }, ...prev.slice(0, 14)]);
         } else {
           // Try Open Food Facts
@@ -165,25 +167,25 @@ export default function AddStock() {
               const cat = data.product.categories ? data.product.categories.split(',')[0] : '';
               const product = { barcode: decodedText, name, category: cat, price: 0, quantity: 1, reorderLevel: 10 };
               addProduct(product);
-              showToast(`Added "${name}" from product database. Set its price in Inventory.`, 'success');
+              showToast(t('addStock.toastAdded', { name }), 'success');
               setRecentAdds(prev => [{ name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
             } else {
               const product = { barcode: decodedText, name: `Product ${decodedText.slice(-6)}`, category: '', price: 0, quantity: 1, reorderLevel: 10 };
               addProduct(product);
-              showToast(`Added unknown barcode ${decodedText}. Edit details in Inventory.`, 'success');
+              showToast(t('addStock.toastUnknown', { code: decodedText }), 'success');
               setRecentAdds(prev => [{ name: product.name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
             }
           } catch {
             const product = { barcode: decodedText, name: `Product ${decodedText.slice(-6)}`, category: '', price: 0, quantity: 1, reorderLevel: 10 };
             addProduct(product);
-            showToast(`Added barcode ${decodedText}. Edit in Inventory.`, 'success');
+            showToast(t('addStock.toastUnknown', { code: decodedText }), 'success');
             setRecentAdds(prev => [{ name: product.name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
           }
         }
       }, () => {});
       setScanning(true);
     } catch {
-      showToast('Camera access denied or not found.', 'error');
+      showToast(t('addStock.errCamera'), 'error');
     }
   };
 
@@ -197,10 +199,10 @@ export default function AddStock() {
   };
 
   const handleEditSave = () => {
-    if (!editForm.name.trim()) { showToast('Name is required', 'error'); return; }
+    if (!editForm.name.trim()) { showToast(t('addStock.errName'), 'error'); return; }
     const product = { barcode: generateId(), name: editForm.name, category: editForm.category, price: Number(editForm.price), quantity: Number(editForm.quantity), reorderLevel: 10 };
     const res = addProduct(product);
-    showToast(`Added "${editForm.name}" (₹${editForm.price}) ×${editForm.quantity}`, 'success');
+    showToast(t('addStock.toastAdded', { name: editForm.name }), 'success');
     setRecentAdds(prev => [{ name: editForm.name, price: editForm.price, qty: editForm.quantity, action: res.action, time: Date.now() }, ...prev.slice(0, 14)]);
     setEditMode(false);
     setEditForm({ name: '', category: '', price: 0, quantity: 1 });
@@ -211,21 +213,21 @@ export default function AddStock() {
       <div className="page-header">
         <h1 className="page-title flex items-center gap-3">
           <span className="stat-icon blue"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></span>
-          Add Stock
+          {t('addStock.title')}
         </h1>
-        <p className="page-subtitle">Scan a label or barcode, or enter a product by hand.</p>
+        <p className="page-subtitle">{t('addStock.subtitle')}</p>
       </div>
 
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-6">
         <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          Label scan
+          {t('addStock.labelScan')}
         </button>
         <button onClick={() => { stopEverything(); setMode('barcode'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'barcode' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          Barcode
+          {t('addStock.barcode')}
         </button>
         <button onClick={() => { stopEverything(); setEditMode(true); }} className="btn bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] py-3 text-sm font-bold">
-          Manual
+          {t('addStock.manual')}
         </button>
       </div>
 
@@ -234,9 +236,9 @@ export default function AddStock() {
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              Label scan
+              {t('addStock.labelScan')}
             </h2>
-            <span className="text-xs text-[var(--text-muted)]">Point at the label, then capture</span>
+            <span className="text-xs text-[var(--text-muted)]">{t('addStock.labelHint')}</span>
           </div>
           <div className="relative bg-black" style={{ minHeight: '320px' }}>
             <video ref={videoRef} className="w-full" style={{ display: scanning ? 'block' : 'none' }} playsInline muted />
@@ -250,19 +252,19 @@ export default function AddStock() {
                   </select>
                 )}
                 <button onClick={startAICamera} className="btn btn-primary px-8 py-4 w-full max-w-xs border-0">
-                  Start camera
+                  {t('addStock.startCamera')}
                 </button>
-                <p className="text-gray-500 text-xs text-center max-w-xs">Point camera at the product packaging where the name and price are visible</p>
+                <p className="text-gray-500 text-xs text-center max-w-xs">{t('addStock.labelHint')}</p>
               </div>
             )}
 
             {scanning && (
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between gap-3">
-                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">Stop</button>
+                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">{t('addStock.stop')}</button>
                 <button onClick={captureAndExtract} disabled={processing} className="btn btn-primary text-lg px-8 py-3 flex-1 border-0 disabled:opacity-50">
                   {processing ? (
-                    <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Reading...</span>
-                  ) : 'Capture'}
+                    <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> {t('addStock.reading')}</span>
+                  ) : t('addStock.capture')}
                 </button>
               </div>
             )}
@@ -271,7 +273,7 @@ export default function AddStock() {
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                 <div className="text-center">
                   <div className="w-12 h-12 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-white font-bold">AI is reading the product...</p>
+                  <p className="text-white font-bold">{t('addStock.reading')}</p>
                 </div>
               </div>
             )}
@@ -279,7 +281,7 @@ export default function AddStock() {
 
           {lastExtracted && (
             <div className="p-4 bg-[var(--surface)] border-t border-[var(--border)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">Last extracted:</p>
+              <p className="text-xs text-[var(--text-muted)] mb-1">{t('addStock.lastRead')}</p>
               <p className="font-bold text-[var(--text-primary)]">{lastExtracted.name} — <span className="text-[var(--success)]">₹{lastExtracted.price}</span></p>
             </div>
           )}
@@ -291,7 +293,7 @@ export default function AddStock() {
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              Barcodener
+              {t('addStock.barcode')}
             </h2>
           </div>
           <div className="relative bg-black" style={{ minHeight: '300px' }}>
@@ -304,14 +306,14 @@ export default function AddStock() {
                   </select>
                 )}
                 <button onClick={startBarcodeScanner} className="btn btn-primary px-8 py-3 w-full max-w-xs">
-                  Start scanner
+                  {t('addStock.startScanner')}
                 </button>
               </div>
             )}
             {scanning && (
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">Scanning</span>
-                <button onClick={stopEverything} className="btn btn-danger btn-sm">Stop</button>
+                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">{t('addStock.scanning')}</span>
+                <button onClick={stopEverything} className="btn btn-danger btn-sm">{t('addStock.stop')}</button>
               </div>
             )}
           </div>
@@ -321,29 +323,29 @@ export default function AddStock() {
       {/* Manual entry Modal */}
       {editMode && (
         <div className="card p-6 mb-6 border-2 border-[var(--primary)]">
-          <h2 className="font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">Manual entry</h2>
+          <h2 className="font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">{t('addStock.manualTitle')}</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Product Name *</label>
-              <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Maggi Noodles" className="form-input-no-icon" required />
+              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.name')} *</label>
+              <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} placeholder="Maggi Noodles" className="form-input-no-icon" required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Category</label>
-                <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Grocery" className="form-input-no-icon" />
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('common.category')}</label>
+                <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="—" className="form-input-no-icon" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Price (₹)</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.price')}</label>
                 <input type="number" min="0" step="0.01" value={editForm.price} onChange={e => setEditForm(p => ({ ...p, price: e.target.value }))} className="form-input-no-icon font-bold" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Quantity</label>
+              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.quantity')}</label>
               <input type="number" min="1" value={editForm.quantity} onChange={e => setEditForm(p => ({ ...p, quantity: e.target.value }))} className="form-input-no-icon text-lg font-bold text-center" />
             </div>
             <div className="flex gap-3">
-              <button onClick={handleEditSave} className="btn btn-primary flex-1 py-3">Add to inventory</button>
-              <button onClick={() => setEditMode(false)} className="btn bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] px-6 py-3">Cancel</button>
+              <button onClick={handleEditSave} className="btn btn-primary flex-1 py-3">{t('addStock.addToInventory')}</button>
+              <button onClick={() => setEditMode(false)} className="btn bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] px-6 py-3">{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -353,13 +355,13 @@ export default function AddStock() {
       {recentAdds.length > 0 && (
         <div className="card p-5">
           <h3 className="font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            Recently added ({recentAdds.length})
+            {t('addStock.recent')} ({recentAdds.length})
           </h3>
           <div className="space-y-2">
             {recentAdds.map((item, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--primary)] transition-colors">
                 <div className="flex items-center gap-3">
-                  <span className={`badge ${item.action === 'added' ? 'badge-success' : 'badge-info'}`}>{item.action === 'added' ? 'New' : '+Stock'}</span>
+                  <span className={`badge ${item.action === 'added' ? 'badge-success' : 'badge-info'}`}>{item.action === 'added' ? t('addStock.newBadge') : t('addStock.stockBadge')}</span>
                   <div>
                     <span className="font-medium text-[var(--text-primary)]">{item.name}</span>
                     {item.price > 0 && <span className="text-xs text-[var(--text-muted)] ml-2">₹{item.price}</span>}

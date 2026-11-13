@@ -18,42 +18,48 @@ Open it on a phone to use the camera for barcode and label scanning. It can also
 
 | Feature | Description |
 |---|---|
-| Stock in | Add products by barcode, by reading the label with the camera, or by hand. Existing products are topped up. |
-| Sell | Scan or search a product and sell it. Stock is deducted immediately. Manual mode works without a camera. |
-| Demand forecast | Projects next week's demand from the last 7 days of sales, with days until stock-out and a suggested reorder quantity. |
-| Low-stock alerts | Notifies you when a sale takes a product to or below its reorder level. |
-| Invoice import | Adds many products at once from a wholesaler bill. |
-| Dashboard | Weekly revenue, today's sales, top sellers, stock health, inventory value and stock by category. |
-| Themes | Dark by default, with a light mode. Responsive down to phone width. |
+| New Sale (POS billing) | The main screen. Add items three ways: tap a quick-access button, search by name, ID or code, or type a code such as `ML 2` or `P1025`. Price and stock are filled in automatically. Barcode scanning is also available. |
+| Automatic inventory update | Completing payment deducts every item from stock at once and shows a before/after summary. No need to open Inventory after a sale. |
+| Supplier invoice reading | Take a photo or upload a supplier bill. The app reads the supplier, invoice number and items, then shows a review screen. Stock changes only after you confirm. |
+| Stock velocity | For each product: current stock, average daily sales, demand trend, predicted demand, days until it runs out, and a recommended order quantity with a plain-language reason. |
+| Low-stock monitoring | Products at or below their minimum stock are flagged automatically on the dashboard, in the notification bell, and in Inventory. |
+| Purchase orders | Create an order from a recommendation, share it on WhatsApp or print it, and mark it received to add the stock. |
+| Sales forecasting | Expected sales for next week, fast- and slow-moving products, products likely to run out, and recommended reorders, written in plain language. |
+| Four languages | English, Telugu, Hindi and Marathi, including product names. Switch from the language menu at the top. |
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A[Scan / Search / Invoice] --> B[Inventory store]
-    B -->|sell| C[Stock deducted + sale recorded]
-    C --> D{Below reorder level?}
+    A[New Sale: tap / search / code] --> B[Complete payment]
+    B --> C[Stock deducted automatically]
+    C --> D{At or below minimum?}
     D -->|yes| E[Low-stock alert]
     C --> F[Sales history]
-    F --> G[7-day demand forecast]
-    G --> H[Days until stock-out + reorder suggestion]
+    F --> G[Velocity + forecast]
+    G --> H[Recommended order]
+    H --> I[Purchase order]
+    I -->|mark received| J[Stock added]
+    K[Supplier invoice photo] --> L[Review and confirm] --> J
 ```
 
-Forecast:
+How the numbers are worked out:
 
-- `avg per day` = units sold in the last 7 days ÷ 7
-- `runs out in` = current stock ÷ avg per day
-- `suggested reorder` = (expected weekly demand + reorder level) − current stock
+- `average daily sales` = units sold in the last 7 days ÷ 7
+- `demand trend` = this week's daily average compared with last week's (up or down by more than 10%)
+- `lasts about` = current stock ÷ average daily sales
+- `recommended order` = expected sales over the cover period (3 days for perishables, 7 for others) + minimum stock − current stock
 
 ## Pages
 
 | Route | Page |
 |---|---|
-| `#/dashboard` | Overview, analytics, forecast and alerts |
-| `#/inventory` | Full catalogue with search, category filter and stock levels |
-| `#/add-stock` | Add stock by AI scan, barcode or manual entry |
-| `#/sell` | Sell by AI scan, barcode or manual search |
-| `#/invoice` | Bulk-import products from a wholesaler invoice |
+| `#/billing` | New Sale (POS billing), the default screen |
+| `#/dashboard` | Sales, forecast, insights and alerts |
+| `#/inventory` | Stock list with velocity and recommendations |
+| `#/invoices` | Supplier invoice upload and review |
+| `#/orders` | Purchase orders |
+| `#/add-stock` | Add products by label scan, barcode or by hand |
 
 ## Tech stack
 
@@ -61,7 +67,9 @@ Forecast:
 - **Vite 4** for dev server and builds
 - **Tailwind CSS 3** plus a CSS-variable design system (`src/index.css`)
 - **html5-qrcode** for barcode scanning
-- **Tesseract.js** for on-device text recognition of product labels
+- **Tesseract.js** for on-device text recognition of labels and invoices
+- **Claude** (optional, with your own Anthropic API key in Settings) for more accurate invoice reading
+- **i18next** for English, Telugu, Hindi and Marathi
 - **vite-plugin-pwa** for offline support and installability
 - **Electron** (optional) for a desktop build
 
@@ -95,16 +103,22 @@ To reset the demo data, run `localStorage.clear()` in the browser console and re
 
 ```
 src/
-├── main.jsx                  # Router + providers
-├── index.css                 # Design system (theme tokens, cards, pills)
-├── context/
-│   ├── InventoryContext.jsx  # Products, sales, add/sell logic, low-stock alerts
-│   ├── ThemeContext.jsx      # Dark / light mode
-│   └── ToastContext.jsx      # Notifications
+├── main.jsx                    # Routes + providers
+├── i18n.js                     # Language setup
+├── locales/app/                # en, te, hi, mr translations
+├── data/seed.js                # Demo products + 4 weeks of sales history
+├── lib/
+│   ├── insights.js             # Velocity, trends, forecasts, recommendations
+│   ├── invoiceParser.js        # OCR text -> supplier, invoice no., items
+│   └── claudeInvoice.js        # Optional Claude vision reading
+├── context/InventoryContext.jsx # Products, bills, stock updates, purchase orders
 └── components/
-    ├── layout/AppShell.jsx   # Top pill nav + mobile bottom nav
-    ├── dashboard/            # Dashboard + demand forecast
-    └── inventory/            # Inventory, AddStock, SellProduct, InvoiceScanner
+    ├── billing/                # New Sale (POS)
+    ├── dashboard/              # Forecasts and insights
+    ├── inventory/              # Stock velocity, Add Stock
+    ├── invoice/                # Supplier invoice reading + review
+    ├── orders/                 # Purchase orders
+    └── layout/                 # Top bar, language menu, settings
 ```
 
 ## Deploying
@@ -117,11 +131,14 @@ npm run deploy
 
 The Vite `base` is set to `/retail-pro-prototype/` in `vite.config.mjs`. If you rename the repository, update it to match.
 
+## Invoice reading
+
+Without any setup, invoices are read on the device with Tesseract OCR. For better accuracy on real, messy bills, open **Settings** and paste an Anthropic API key. Invoices are then read with Claude. The key is stored only in that browser. Either way, nothing is added to inventory until you review and confirm.
+
 ## Roadmap
 
 - [ ] Connect to the Spring Boot + MongoDB backend for multi-device sync
-- [ ] Bills and GST invoices with printable receipts
+- [ ] GST invoices
 - [ ] Customer records and loyalty
-- [ ] Multi-language UI (English, Hindi, Marathi, Telugu)
 - [ ] Push notifications for low stock
 

@@ -1,29 +1,38 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import translationEN from './locales/en/translation.json';
-import translationHI from './locales/hi/translation.json';
-import translationMR from './locales/mr/translation.json';
-import translationTE from './locales/te/translation.json';
+import en from './locales/app/en';
+import te from './locales/app/te';
+import hi from './locales/app/hi';
+import mr from './locales/app/mr';
 
-// Get language from the same place our Navbar sets it
-const savedLang = localStorage.getItem('sr_lang') || 'en';
+export const LANGUAGES = [
+  { code: 'en', label: 'English', native: 'English' },
+  { code: 'te', label: 'Telugu', native: 'తెలుగు' },
+  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
+  { code: 'mr', label: 'Marathi', native: 'मराठी' },
+];
 
-const resources = {
-  en: { translation: translationEN },
-  hi: { translation: translationHI },
-  mr: { translation: translationMR },
-  te: { translation: translationTE },
+let saved = 'en';
+try { saved = localStorage.getItem('sr_lang') || 'en'; } catch { /* storage blocked */ }
+if (!LANGUAGES.some(l => l.code === saved)) saved = 'en';
+
+i18n.use(initReactI18next).init({
+  resources: {
+    en: { translation: en },
+    te: { translation: te },
+    hi: { translation: hi },
+    mr: { translation: mr },
+  },
+  lng: saved,
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
+});
+
+const applyLang = (lng) => {
+  document.documentElement.lang = lng;
+  try { localStorage.setItem('sr_lang', lng); } catch { /* storage blocked */ }
 };
-
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: savedLang, // Use the saved language
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false, // React already safes from XSS
-    },
-  });
+applyLang(saved);
+i18n.on('languageChanged', applyLang);
 
 export default i18n;
