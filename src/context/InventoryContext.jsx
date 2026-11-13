@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
+import { useToast } from './ToastContext';
+
 const InventoryContext = createContext();
 export const useInventory = () => useContext(InventoryContext);
 
@@ -30,6 +32,7 @@ const SEED_SALES = [
 ];
 
 export const InventoryProvider = ({ children }) => {
+  const { showToast } = useToast() || {};
   const [products, setProducts] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -78,16 +81,26 @@ export const InventoryProvider = ({ children }) => {
     return results;
   }, []);
 
-  const sellProduct = useCallback((barcode, qty) => {
-    const product = products.find(p => p.barcode === barcode);
+  // Accepts a product id OR a barcode
+  const sellProduct = useCallback((idOrBarcode, qty = 1) => {
+    const product = products.find(p => p.id === idOrBarcode || p.barcode === idOrBarcode);
     if (!product) return { success: false, error: 'Product not found' };
+    if (qty < 1) return { success: false, error: 'Invalid quantity' };
     if (product.quantity < qty) return { success: false, error: `Only ${product.quantity} in stock` };
 
-    setProducts(prev => prev.map(p => p.barcode === barcode ? { ...p, quantity: p.quantity - qty } : p));
-    const sale = { id: 'S' + Date.now(), productId: product.id, productName: product.name, qty, price: product.price, total: product.price * qty, date: Date.now() };
+    const remaining = product.quantity - qty;
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, quantity: remaining } : p));
+    const sale = { id: 'S' + Date.now() + Math.random().toString(36).slice(2, 6), productId: product.id, productName: product.name, qty, price: product.price, total: product.price * qty, date: Date.now() };
     setSales(prev => [...prev, sale]);
+
+    // Low-stock notification when this sale crosses the reorder level
+    if (remaining <= product.reorderLevel && product.quantity > product.reorderLevel) {
+      showToast?.(`⚠️ Low stock: "${product.name}" has only ${remaining} left (min ${product.reorderLevel})`, 'error');
+    } else if (remaining === 0) {
+      showToast?.(`⚠️ "${product.name}" is now out of stock`, 'error');
+    }
     return { success: true, sale, product };
-  }, [products]);
+  }, [products, showToast]);
 
   const findByBarcode = useCallback((barcode) => products.find(p => p.barcode === barcode), [products]);
 

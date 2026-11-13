@@ -234,7 +234,7 @@ export default function AddStock() {
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <span className="text-purple-400">✨</span> AI Smart Scan
+              <span className="text-[var(--primary)]">✨</span> AI Smart Scan
             </h2>
             <span className="text-xs text-[var(--text-muted)]">Point at product label → Tap Capture</span>
           </div>
@@ -249,7 +249,7 @@ export default function AddStock() {
                     {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
                   </select>
                 )}
-                <button onClick={startAICamera} className="btn bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 text-lg shadow-glow w-full max-w-xs border-0">
+                <button onClick={startAICamera} className="btn btn-primary px-8 py-4 text-lg shadow-glow w-full max-w-xs border-0">
                   ✨ Start AI Camera
                 </button>
                 <p className="text-gray-500 text-xs text-center max-w-xs">Point camera at the product packaging where the name and price are visible</p>
@@ -258,8 +258,8 @@ export default function AddStock() {
 
             {scanning && (
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between gap-3">
-                <button onClick={stopAICamera} className="btn bg-red-600/80 text-white text-sm px-4 py-3 rounded-xl">✕ Stop</button>
-                <button onClick={captureAndExtract} disabled={processing} className="btn bg-gradient-to-r from-green-500 to-emerald-600 text-white text-lg px-8 py-3 rounded-xl shadow-glow flex-1 border-0 disabled:opacity-50">
+                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">✕ Stop</button>
+                <button onClick={captureAndExtract} disabled={processing} className="btn btn-primary text-lg px-8 py-3 shadow-glow flex-1 border-0 disabled:opacity-50">
                   {processing ? (
                     <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Reading...</span>
                   ) : '📸 Capture & Add'}
@@ -270,8 +270,8 @@ export default function AddStock() {
             {processing && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                 <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-purple-300 font-bold">AI is reading the product...</p>
+                  <div className="w-12 h-12 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-white font-bold">AI is reading the product...</p>
                 </div>
               </div>
             )}
@@ -291,7 +291,7 @@ export default function AddStock() {
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <span className="text-blue-400">📊</span> Barcode Scanner
+              <span className="text-[var(--primary)]">📊</span> Barcode Scanner
             </h2>
           </div>
           <div className="relative bg-black" style={{ minHeight: '300px' }}>
@@ -310,8 +310,8 @@ export default function AddStock() {
             )}
             {scanning && (
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <span className="bg-black/70 text-green-400 text-xs px-3 py-2 rounded-full animate-pulse">📊 Scanning...</span>
-                <button onClick={stopEverything} className="bg-red-600/80 text-white text-xs px-4 py-2 rounded-full">Stop</button>
+                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">📊 Scanning...</span>
+                <button onClick={stopEverything} className="btn btn-danger btn-sm">Stop</button>
               </div>
             )}
           </div>
@@ -353,7 +353,7 @@ export default function AddStock() {
       {recentAdds.length > 0 && (
         <div className="card p-5">
           <h3 className="font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <span className="text-green-400">✓</span> Recently Added ({recentAdds.length})
+            <span className="text-[var(--primary)]">✓</span> Recently Added ({recentAdds.length})
           </h3>
           <div className="space-y-2">
             {recentAdds.map((item, i) => (

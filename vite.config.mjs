@@ -22,7 +22,7 @@ export default defineConfig({
         name: 'Smart Retail Pro',
         short_name: 'RetailPro',
         description: 'Smart Billing & Inventory Management System',
-        theme_color: '#ffffff',
+        theme_color: '#0D0D0D',
         icons: [
           {
             src: 'https://via.placeholder.com/192x192.png?text=Retail+Pro',
