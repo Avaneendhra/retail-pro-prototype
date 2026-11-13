@@ -133,7 +133,7 @@ export default {
   },
 
   install: {
-    title: 'Get the stokd app', body: 'Install it on this phone: opens full-screen, works offline, one tap from your home screen.',
+    title: 'Get the stokd app', body: 'Install it on this device: opens full-screen, works offline, one tap from your home screen.',
     ios: 'On iPhone: tap the Share button, then "Add to Home Screen".', button: 'Install app',
     settingsTitle: 'Phone app', installed: 'Installed on this device.', manual: 'Open this site in Chrome or Safari on your phone and choose "Install app" or "Add to Home Screen".',
   },
