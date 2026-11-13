@@ -24,15 +24,15 @@ export default function Inventory() {
           </h1>
           <p className="page-subtitle">View and manage your entire stock catalog</p>
         </div>
-        <div className="bg-[var(--surface)] p-3 rounded-xl border border-[var(--border)] shadow-sm flex items-center gap-4">
+        <div className="card card-accent-blue px-7 py-5 flex items-center gap-6">
           <div>
-            <p className="text-xs text-[var(--text-muted)] font-semibold uppercase">Total Products</p>
-            <p className="text-xl font-bold text-[var(--text-primary)]">{products.length}</p>
+            <p className="eyebrow text-[11px]">Total Products</p>
+            <p className="metric text-[30px] mt-1">{products.length}</p>
           </div>
           <div className="w-px h-8 bg-[var(--border)]" />
           <div>
-            <p className="text-xs text-[var(--text-muted)] font-semibold uppercase">Stock Value</p>
-            <p className="text-xl font-bold text-[var(--success)]">₹{totalInventoryValue.toLocaleString('en-IN')}</p>
+            <p className="eyebrow text-[11px]">Stock Value</p>
+            <p className="metric text-[30px] mt-1">₹{totalInventoryValue.toLocaleString('en-IN')}</p>
           </div>
         </div>
       </div>
@@ -45,7 +45,7 @@ export default function Inventory() {
             <input 
               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by product name or barcode..." 
-              className="form-input"
+              className="form-input pl-11"
             />
           </div>
           <select 
