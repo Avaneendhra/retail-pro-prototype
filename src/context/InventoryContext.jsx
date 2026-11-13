@@ -1,107 +1,222 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useToast } from './ToastContext';
+import { SEED_PRODUCTS, seedProducts, generateSalesHistory, CATEGORIES } from '../data/seed';
+import { computeStats } from '../lib/insights';
+import i18n from '../i18n';
+import { pname } from '../lib/format';
 
-const InventoryContext = createContext();
+const InventoryContext = createContext(null);
 export const useInventory = () => useContext(InventoryContext);
 
-const STORAGE_KEY = 'sr_inventory';
-const SALES_KEY = 'sr_sales';
+const KEYS = {
+  products: 'sr2_products',
+  sales: 'sr2_sales',
+  bills: 'sr2_bills',
+  pos: 'sr2_purchase_orders',
+  meta: 'sr2_meta',
+};
 
-// Seed data for demo
-const SEED_PRODUCTS = [
-  { id: 'P001', barcode: '8901030985551', name: 'Maggi 2-Minute Noodles', category: 'Grocery', price: 14, quantity: 120, reorderLevel: 20, addedAt: Date.now() },
-  { id: 'P002', barcode: '8901262150821', name: 'Amul Butter 100g', category: 'Dairy', price: 58, quantity: 45, reorderLevel: 15, addedAt: Date.now() },
-  { id: 'P003', barcode: '8901719280041', name: 'Parachute Coconut Oil 100ml', category: 'Personal Care', price: 40, quantity: 8, reorderLevel: 10, addedAt: Date.now() },
-  { id: 'P004', barcode: '8901058850654', name: 'Coca Cola 1.25L', category: 'Beverages', price: 65, quantity: 60, reorderLevel: 25, addedAt: Date.now() },
-  { id: 'P005', barcode: '8901314332306', name: 'Dairy Milk Silk', category: 'Snacks', price: 80, quantity: 5, reorderLevel: 10, addedAt: Date.now() },
-  { id: 'P006', barcode: '8901491101219', name: 'Parle-G Biscuit 250g', category: 'Snacks', price: 25, quantity: 200, reorderLevel: 30, addedAt: Date.now() },
-  { id: 'P007', barcode: '8901063267015', name: 'Surf Excel Matic 1kg', category: 'Household', price: 199, quantity: 3, reorderLevel: 8, addedAt: Date.now() },
-  { id: 'P008', barcode: '8901396523116', name: 'Tata Salt 1kg', category: 'Grocery', price: 28, quantity: 90, reorderLevel: 20, addedAt: Date.now() },
-];
+const load = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback();
+  } catch { return fallback(); }
+};
+const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ } };
 
-const SEED_SALES = [
-  { id: 'S001', productId: 'P001', productName: 'Maggi 2-Minute Noodles', qty: 5, price: 14, total: 70, date: Date.now() - 86400000 * 6 },
-  { id: 'S002', productId: 'P004', productName: 'Coca Cola 1.25L', qty: 3, price: 65, total: 195, date: Date.now() - 86400000 * 5 },
-  { id: 'S003', productId: 'P006', productName: 'Parle-G Biscuit 250g', qty: 10, price: 25, total: 250, date: Date.now() - 86400000 * 4 },
-  { id: 'S004', productId: 'P005', productName: 'Dairy Milk Silk', qty: 4, price: 80, total: 320, date: Date.now() - 86400000 * 3 },
-  { id: 'S005', productId: 'P002', productName: 'Amul Butter 100g', qty: 2, price: 58, total: 116, date: Date.now() - 86400000 * 2 },
-  { id: 'S006', productId: 'P001', productName: 'Maggi 2-Minute Noodles', qty: 8, price: 14, total: 112, date: Date.now() - 86400000 * 1 },
-  { id: 'S007', productId: 'P007', productName: 'Surf Excel Matic 1kg', qty: 2, price: 199, total: 398, date: Date.now() - 86400000 * 1 },
-  { id: 'S008', productId: 'P003', productName: 'Parachute Coconut Oil 100ml', qty: 3, price: 40, total: 120, date: Date.now() },
-];
+const freshMeta = () => ({ nextBill: 1025, nextPO: 101, nextSku: 1017 });
 
 export const InventoryProvider = ({ children }) => {
+  const { showToast } = useToast() || {};
+
   const [products, setProducts] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : SEED_PRODUCTS;
-    } catch { return SEED_PRODUCTS; }
+    // Older saved demo data used seed barcodes with wrong check digits; fix them in place.
+    const seedById = Object.fromEntries(SEED_PRODUCTS.map(p => [p.id, p.barcode]));
+    return load(KEYS.products, seedProducts).map(p =>
+      seedById[p.id] && p.barcode !== seedById[p.id] && p.barcode.slice(0, 12) === seedById[p.id].slice(0, 12)
+        ? { ...p, barcode: seedById[p.id] } : p);
   });
+  const [sales, setSales] = useState(() => load(KEYS.sales, () => generateSalesHistory(SEED_PRODUCTS)));
+  const [bills, setBills] = useState(() => load(KEYS.bills, () => []));
+  const [purchaseOrders, setPurchaseOrders] = useState(() => load(KEYS.pos, () => []));
+  const [meta, setMeta] = useState(() => load(KEYS.meta, freshMeta));
 
-  const [sales, setSales] = useState(() => {
-    try {
-      const saved = localStorage.getItem(SALES_KEY);
-      return saved ? JSON.parse(saved) : SEED_SALES;
-    } catch { return SEED_SALES; }
-  });
+  useEffect(() => save(KEYS.products, products), [products]);
+  useEffect(() => save(KEYS.sales, sales), [sales]);
+  useEffect(() => save(KEYS.bills, bills), [bills]);
+  useEffect(() => save(KEYS.pos, purchaseOrders), [purchaseOrders]);
+  useEffect(() => save(KEYS.meta, meta), [meta]);
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(products)); }, [products]);
-  useEffect(() => { localStorage.setItem(SALES_KEY, JSON.stringify(sales)); }, [sales]);
+  // Keep a ref so actions always see the latest state (fast repeated taps).
+  const productsRef = useRef(products);
+  productsRef.current = products;
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
 
-  const addProduct = useCallback((product) => {
-    const existing = products.find(p => p.barcode === product.barcode);
-    if (existing) {
-      setProducts(prev => prev.map(p => p.barcode === product.barcode ? { ...p, quantity: p.quantity + (product.quantity || 1) } : p));
-      return { action: 'updated', product: existing };
-    }
-    const newProduct = { ...product, id: 'P' + Date.now(), addedAt: Date.now() };
-    setProducts(prev => [...prev, newProduct]);
-    return { action: 'added', product: newProduct };
-  }, [products]);
+  const stats = useMemo(() => computeStats(products, sales), [products, sales]);
+  const lowStockProducts = useMemo(() => products.filter(p => p.quantity <= (p.min ?? 0)), [products]);
 
-  const addBulkProducts = useCallback((productsList) => {
-    const results = [];
-    setProducts(prev => {
-      let updated = [...prev];
-      productsList.forEach(p => {
-        const existingIdx = updated.findIndex(ex => ex.barcode === p.barcode || ex.name.toLowerCase() === p.name.toLowerCase());
-        if (existingIdx >= 0) {
-          updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + (p.quantity || 1) };
-          results.push({ action: 'updated', name: updated[existingIdx].name });
-        } else {
-          const newP = { ...p, id: 'P' + Date.now() + Math.random().toString(36).substring(7), addedAt: Date.now() };
-          updated.push(newP);
-          results.push({ action: 'added', name: newP.name });
-        }
-      });
-      return updated;
-    });
-    return results;
+  const byId = useCallback((id) => productsRef.current.find(p => p.id === id), []);
+  const findByBarcode = useCallback((barcode) => productsRef.current.find(p => p.barcode === String(barcode).trim()), []);
+  const findByCode = useCallback((code) => {
+    const c = String(code).trim().toUpperCase();
+    return productsRef.current.find(p => p.code?.toUpperCase() === c || p.id.toUpperCase() === c || p.barcode === c);
   }, []);
 
-  const sellProduct = useCallback((barcode, qty) => {
-    const product = products.find(p => p.barcode === barcode);
-    if (!product) return { success: false, error: 'Product not found' };
-    if (product.quantity < qty) return { success: false, error: `Only ${product.quantity} in stock` };
+  /** Notify for products that just crossed their minimum. */
+  const notifyLowStock = useCallback((changes) => {
+    for (const ch of changes) {
+      if (ch.after <= ch.min && ch.before > ch.min) {
+        const p = productsRef.current.find(x => x.id === ch.productId) || ch;
+        showToast?.(ch.after <= 0
+          ? i18n.t('toast.outOfStock', { name: pname(p) })
+          : i18n.t('toast.lowStock', { name: pname(p), qty: ch.after, min: ch.min }), 'error');
+      }
+    }
+  }, [showToast]);
 
-    setProducts(prev => prev.map(p => p.barcode === barcode ? { ...p, quantity: p.quantity - qty } : p));
-    const sale = { id: 'S' + Date.now(), productId: product.id, productName: product.name, qty, price: product.price, total: product.price * qty, date: Date.now() };
-    setSales(prev => [...prev, sale]);
-    return { success: true, sale, product };
-  }, [products]);
+  /**
+   * Complete a sale: validate, deduct stock, record bill + sales lines.
+   * cart: [{ productId, qty }]
+   */
+  const checkout = useCallback((cart, payment = { method: 'cash' }) => {
+    const current = productsRef.current;
+    const lines = [];
+    for (const item of cart) {
+      const p = current.find(x => x.id === item.productId);
+      if (!p) return { ok: false, error: i18n.t('billing.errNotFound') };
+      if (item.qty > p.quantity) return { ok: false, error: i18n.t('billing.errStock', { name: pname(p), qty: p.quantity }) };
+      lines.push({ p, qty: item.qty });
+    }
+    if (!lines.length) return { ok: false, error: i18n.t('billing.errEmpty') };
 
-  const findByBarcode = useCallback((barcode) => products.find(p => p.barcode === barcode), [products]);
+    const now = Date.now();
+    const billNo = metaRef.current.nextBill;
+    const billId = `B${billNo}`;
+    const changes = lines.map(({ p, qty }) => ({ productId: p.id, name: p.name, names: p.names, before: p.quantity, after: p.quantity - qty, qty, min: p.min ?? 0 }));
+    const items = lines.map(({ p, qty }) => ({ productId: p.id, name: p.name, names: p.names, code: p.code, qty, price: p.price, total: qty * p.price }));
+    const total = items.reduce((s, i) => s + i.total, 0);
+    const bill = { id: billId, billNo, date: now, items, total, payment, changes };
 
-  const lowStockProducts = products.filter(p => p.quantity <= p.reorderLevel);
+    setProducts(prev => prev.map(p => {
+      const ch = changes.find(c => c.productId === p.id);
+      return ch ? { ...p, quantity: ch.after } : p;
+    }));
+    setSales(prev => [...prev, ...items.map((it, i) => ({
+      id: `${billId}-${i}`, billId, productId: it.productId, productName: it.name, qty: it.qty, price: it.price, total: it.total, date: now,
+    }))]);
+    setBills(prev => [bill, ...prev].slice(0, 500));
+    setMeta(m => ({ ...m, nextBill: m.nextBill + 1 }));
+    notifyLowStock(changes);
+    return { ok: true, bill, changes };
+  }, [notifyLowStock]);
+
+  /**
+   * Add stock (supplier invoice, purchase order, manual).
+   * items: [{ productId, qty }] or [{ newProduct: {...}, qty }]
+   */
+  const receiveStock = useCallback((items) => {
+    const current = productsRef.current;
+    let nextSku = metaRef.current.nextSku;
+    const created = [];
+    const changes = [];
+    const qtyById = {};
+    for (const it of items) {
+      const qty = Math.max(0, Math.round(Number(it.qty) || 0));
+      if (!qty) continue;
+      if (it.newProduct) {
+        const np = it.newProduct;
+        const id = `P${nextSku++}`;
+        const product = {
+          id, code: (np.code || np.name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(),
+          barcode: np.barcode || id, name: np.name, names: np.names || {}, category: CATEGORIES.includes(np.category) ? np.category : 'other',
+          price: Number(np.price) || 0, quantity: qty, min: Number(np.min) || 5, coverDays: 7, addedAt: Date.now(),
+          ...(np.needsReview ? { needsReview: true } : {}),
+        };
+        created.push(product);
+        changes.push({ productId: id, name: product.name, names: product.names, before: 0, after: qty, qty, isNew: true });
+      } else {
+        qtyById[it.productId] = (qtyById[it.productId] || 0) + qty;
+      }
+    }
+    for (const [id, qty] of Object.entries(qtyById)) {
+      const p = current.find(x => x.id === id);
+      if (p) changes.push({ productId: id, name: p.name, names: p.names, before: p.quantity, after: p.quantity + qty, qty });
+    }
+    setProducts(prev => [...prev.map(p => qtyById[p.id] ? { ...p, quantity: p.quantity + qtyById[p.id] } : p), ...created]);
+    if (nextSku !== metaRef.current.nextSku) setMeta(m => ({ ...m, nextSku }));
+    return changes;
+  }, []);
+
+  /** Used by the scan/manual Add Stock page. Matches by barcode, else creates. */
+  const addProduct = useCallback((product) => {
+    const existing = product.barcode && productsRef.current.find(p => p.barcode === product.barcode);
+    if (existing) {
+      receiveStock([{ productId: existing.id, qty: product.quantity || 1 }]);
+      return { action: 'updated', product: existing };
+    }
+    const [ch] = receiveStock([{ newProduct: { ...product, min: product.min ?? product.reorderLevel ?? 5 }, qty: product.quantity || 1 }]);
+    return { action: 'added', product: { ...product, id: ch?.productId } };
+  }, [receiveStock]);
+
+  const updateProduct = useCallback((id, patch) => {
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  }, []);
+
+  /* ── Purchase orders ── */
+  const createPO = useCallback(({ supplier = '', items }) => {
+    const poNo = metaRef.current.nextPO;
+    const po = {
+      id: `PO${poNo}`, poNo, supplier, status: 'draft', createdAt: Date.now(),
+      items: items.map(i => ({ productId: i.productId, qty: Math.max(1, Math.round(i.qty)) })),
+    };
+    setPurchaseOrders(prev => [po, ...prev]);
+    setMeta(m => ({ ...m, nextPO: m.nextPO + 1 }));
+    return po;
+  }, []);
+
+  const updatePO = useCallback((id, patch) => {
+    setPurchaseOrders(prev => prev.map(po => po.id === id ? { ...po, ...patch } : po));
+  }, []);
+
+  const deletePO = useCallback((id) => {
+    setPurchaseOrders(prev => prev.filter(po => po.id !== id));
+  }, []);
+
+  const receivePO = useCallback((id) => {
+    const po = purchaseOrdersRef.current.find(p => p.id === id);
+    if (!po || po.status === 'received') return [];
+    const changes = receiveStock(po.items);
+    setPurchaseOrders(prev => prev.map(p => p.id === id ? { ...p, status: 'received', receivedAt: Date.now(), changes } : p));
+    return changes;
+  }, [receiveStock]);
+  const purchaseOrdersRef = useRef(purchaseOrders);
+  purchaseOrdersRef.current = purchaseOrders;
+
+  /** Reverse a receiveStock() result (used by Undo after an automatic add). */
+  const revertStock = useCallback((changes) => {
+    const removeIds = new Set(changes.filter(c => c.isNew).map(c => c.productId));
+    const minus = Object.fromEntries(changes.filter(c => !c.isNew).map(c => [c.productId, c.qty]));
+    setProducts(prev => prev
+      .filter(p => !removeIds.has(p.id))
+      .map(p => minus[p.id] ? { ...p, quantity: Math.max(0, p.quantity - minus[p.id]) } : p));
+  }, []);
+
+  const resetDemo = useCallback(() => {
+    setProducts(seedProducts());
+    setSales(generateSalesHistory(SEED_PRODUCTS));
+    setBills([]);
+    setPurchaseOrders([]);
+    setMeta(freshMeta());
+  }, []);
 
   const totalInventoryValue = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const totalSalesValue = sales.reduce((sum, s) => sum + s.total, 0);
 
-  return (
-    <InventoryContext.Provider value={{
-      products, sales, addProduct, addBulkProducts, sellProduct, findByBarcode,
-      lowStockProducts, totalInventoryValue, totalSalesValue, setProducts, setSales
-    }}>
-      {children}
-    </InventoryContext.Provider>
-  );
+  const value = {
+    products, sales, bills, purchaseOrders, stats, lowStockProducts, totalInventoryValue, nextBillNo: meta.nextBill,
+    byId, findByBarcode, findByCode, checkout, receiveStock, revertStock, addProduct, updateProduct,
+    createPO, updatePO, deletePO, receivePO, resetDemo,
+  };
+
+  return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;
 };

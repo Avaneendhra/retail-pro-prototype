@@ -1,220 +1,228 @@
 import React, { useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useInventory } from '../../context/InventoryContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { useToast } from '../../context/ToastContext';
+import { businessSummary, startOfDay } from '../../lib/insights';
+import { inr, pname, weekdayShort, fmtTime } from '../../lib/format';
+import { TrendMark } from '../inventory/Inventory';
 
-const COLORS = ['#38BDF8', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'];
+const pct = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`;
+
+function ListCard({ title, tag, children, accent }) {
+  return (
+    <div className={`card p-7 flex flex-col ${accent || ''}`}>
+      <div className="flex items-start justify-between mb-5">
+        <span className="eyebrow">{title}</span>
+        {tag && <span className="tag">{tag}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const { products, sales, lowStockProducts, totalInventoryValue, totalSalesValue } = useInventory();
+  const { t } = useTranslation();
+  const { products, sales, bills, stats, lowStockProducts, createPO } = useInventory();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
 
-  // Sales by product (demand chart)
-  const demandData = useMemo(() => {
-    const map = {};
-    sales.forEach(s => {
-      map[s.productName] = (map[s.productName] || 0) + s.qty;
-    });
-    return Object.entries(map)
-      .map(([name, qty]) => ({ name: name.length > 15 ? name.substring(0, 15) + '…' : name, qty, fullName: name }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 8);
-  }, [sales]);
+  const sum = useMemo(() => businessSummary(products, sales, stats), [products, sales, stats]);
+  const byId = (id) => products.find(p => p.id === id);
 
-  // Sales over time (last 7 days)
-  const salesTrend = useMemo(() => {
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(Date.now() - i * 86400000);
-      const dayStr = date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
-      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-      const dayEnd = dayStart + 86400000;
-      const dayTotal = sales.filter(s => s.date >= dayStart && s.date < dayEnd).reduce((sum, s) => sum + s.total, 0);
-      days.push({ day: dayStr, revenue: dayTotal });
-    }
-    return days;
-  }, [sales]);
+  const weekMax = Math.max(1, ...sum.days.map(d => d.revenue));
+  const hot = [...sum.days].map(d => d.revenue).sort((a, b) => b - a)[2] ?? 0;
+  const today = sum.days[6], yesterday = sum.days[5];
+  const delta = yesterday.revenue > 0 ? ((today.revenue - yesterday.revenue) / yesterday.revenue) * 100 : null;
+  const billsToday = bills.filter(b => b.date >= startOfDay(0)).length;
+  const healthy = products.filter(p => stats[p.id].status === 'ok').length;
 
-  // Category distribution
-  const categoryData = useMemo(() => {
-    const map = {};
-    products.forEach(p => {
-      const cat = p.category || 'Other';
-      map[cat] = (map[cat] || 0) + p.quantity;
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [products]);
+  const orderAll = () => {
+    const po = createPO({ items: sum.replenish.map(({ p, s }) => ({ productId: p.id, qty: s.recommendedQty })) });
+    showToast(t('inventory.poCreated', { no: po.id }), 'success');
+    navigate(`/orders?open=${po.id}`);
+  };
 
-  const todaySales = useMemo(() => {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    return sales.filter(s => s.date >= todayStart.getTime());
-  }, [sales]);
-
-  const todayRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
+  const toneDot = { danger: 'bg-[var(--danger)]', warning: 'bg-[var(--warning)]', info: 'bg-[var(--accent-blue)]', muted: 'bg-[var(--text-muted)]' };
+  const daysText = (d) => (d < 1 ? t('dashboard.todayShort') : t('dashboard.inDays', { n: Math.max(1, Math.round(d)) }));
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">Real-time inventory analytics & alerts</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="stat-icon blue"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg></span>
+    <div>
+      {/* ── Hero + headline ── */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-6 lg:gap-10 mb-6 pt-2 lg:pt-6">
+        <div className="flex flex-col justify-center">
+          <div className="flex items-center gap-3 eyebrow mb-8">
+            <span className="status-dot" />{t('dashboard.storeOpen')}<span className="opacity-60">•</span>
+            <span className="font-mono tracking-[0.06em]">{t('dashboard.skus', { count: products.length })}</span>
           </div>
-          <div className="stat-value">{products.length}</div>
-          <div className="stat-label">Total Products</div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="stat-icon green"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>
+          <h1 className="display-xl">{t('dashboard.heroTitle1')}<br />{t('dashboard.heroTitle2')}<br />{t('dashboard.heroTitle3')}</h1>
+          <p className="text-[var(--text-secondary)] text-lg leading-relaxed max-w-md mt-8">{t('dashboard.heroSub')}</p>
+          <div className="flex flex-wrap gap-3 mt-10">
+            <Link to="/home" className="btn btn-cta">{t('dashboard.startSale')}</Link>
+            <Link to="/inventory" className="btn btn-ghost">{t('dashboard.viewStock')}</Link>
           </div>
-          <div className="stat-value">₹{totalInventoryValue.toLocaleString('en-IN')}</div>
-          <div className="stat-label">Inventory Value</div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="stat-icon amber"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg></span>
-          </div>
-          <div className="stat-value">₹{todayRevenue.toLocaleString('en-IN')}</div>
-          <div className="stat-label">Today's Sales</div>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <span className="stat-icon red"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></span>
-          </div>
-          <div className="stat-value text-[var(--danger)]">{lowStockProducts.length}</div>
-          <div className="stat-label">Low Stock Alerts</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Demand Chart */}
-        <div className="card p-5">
-          <h3 className="card-title mb-4">📊 Product Demand (by units sold)</h3>
-          {demandData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={demandData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} />
-                <YAxis tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '13px' }}
-                  formatter={(value, name, props) => [`${value} units`, props.payload.fullName]} />
-                <Bar dataKey="qty" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <p className="text-center text-[var(--text-muted)] py-12">No sales data yet</p>}
         </div>
 
-        {/* Revenue Trend */}
-        <div className="card p-5">
-          <h3 className="card-title mb-4">📈 Revenue Trend (Last 7 Days)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={salesTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="day" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-              <YAxis tick={{ fontSize: 12, fill: 'var(--text-muted)' }} tickFormatter={v => `₹${v}`} />
-              <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '13px' }}
-                formatter={v => [`₹${v.toLocaleString('en-IN')}`, 'Revenue']} />
-              <Line type="monotone" dataKey="revenue" stroke="var(--success)" strokeWidth={3} dot={{ fill: 'var(--success)', r: 5 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Category Distribution */}
-        <div className="card p-5">
-          <h3 className="card-title mb-4">📦 Inventory by Category</h3>
-          {categoryData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="50%" height={200}>
-                <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={80} dataKey="value" paddingAngle={3}>
-                    {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', fontSize: '13px' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
-                {categoryData.map((cat, i) => (
-                  <div key={cat.name} className="flex items-center gap-2 text-sm">
-                    <div className="w-3 h-3 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
-                    <span className="text-[var(--text-secondary)] flex-grow">{cat.name}</span>
-                    <span className="font-bold text-[var(--text-primary)]">{cat.value}</span>
-                  </div>
-                ))}
-              </div>
+        <div className="flex flex-col gap-6">
+          <div className="card card-accent-blue p-8">
+            <div className="flex items-start justify-between">
+              <span className="eyebrow">{t('dashboard.revenue7')}</span>
+              {sum.weekChangePct !== null && <span className="text-sm font-semibold">{t('dashboard.weekChange', { pct: pct(sum.weekChangePct) })}</span>}
             </div>
-          ) : <p className="text-center text-[var(--text-muted)] py-12">No products</p>}
-        </div>
-
-        {/* Low Stock Alerts */}
-        <div className="card p-5">
-          <h3 className="card-title mb-4 flex items-center gap-2">
-            <span className="text-[var(--danger)]">⚠️</span> Low Stock Alerts
-          </h3>
-          {lowStockProducts.length > 0 ? (
-            <div className="space-y-3 max-h-[250px] overflow-y-auto custom-scrollbar">
-              {lowStockProducts.map(p => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg)] border border-[var(--border)]">
-                  <div>
-                    <p className="font-semibold text-[var(--text-primary)] text-sm">{p.name}</p>
-                    <p className="text-xs text-[var(--text-muted)]">{p.category}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-bold text-lg ${p.quantity <= 5 ? 'text-[var(--danger)]' : 'text-[var(--warning)]'}`}>{p.quantity}</p>
-                    <p className="text-xs text-[var(--text-muted)]">Min: {p.reorderLevel}</p>
-                  </div>
+            <div className="metric text-[60px] sm:text-[72px] mt-4">{inr(sum.revenue7)}</div>
+            <div className="pill-bars mt-8">
+              {sum.days.map((d, i) => (
+                <div key={i} title={`${weekdayShort(d.start)}: ${inr(d.revenue)}`}>
+                  <div className={`pill-bar ${d.revenue > 0 && d.revenue >= hot ? 'hot' : ''}`} style={{ height: `${Math.max(27, (d.revenue / weekMax) * 100)}%` }} />
+                  <span>{weekdayShort(d.start)}</span>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <span className="text-4xl mb-2 block">✅</span>
-              <p className="font-medium text-[var(--success)]">All products are well-stocked!</p>
+          </div>
+
+          <div className="card p-8 relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <span className="eyebrow">{t('dashboard.today')}</span>
+              <span className="eyebrow">{t('dashboard.live')}</span>
+            </div>
+            <div className="metric text-[60px] sm:text-[68px] mt-6">{inr(today.revenue)}</div>
+            <div className="mt-6 font-semibold flex flex-wrap gap-x-4 gap-y-1">
+              {delta !== null && <span className={delta >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>{t('dashboard.vsYesterday', { pct: pct(delta) })}</span>}
+              <span className="text-[var(--text-secondary)] font-medium">{t('dashboard.billsToday', { count: billsToday })}</span>
+            </div>
+            <div className="hatch absolute right-0 bottom-0 w-48 h-20 pointer-events-none" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Insights + forecast ── */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-6 mb-6">
+        <div className="card p-8">
+          <span className="eyebrow">{t('dashboard.insights')}</span>
+          <ul className="mt-6 divide-y divide-[var(--border)]">
+            {sum.insights.length === 0 && <li className="py-4 text-[var(--text-secondary)]">{t('dashboard.noInsights')}</li>}
+            {sum.insights.map((ins, i) => {
+              const p = byId(ins.productId);
+              return (
+                <li key={i}>
+                  <Link to={`/inventory?focus=${ins.productId}`} className="flex items-center gap-4 py-4 group">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${toneDot[ins.tone]}`} />
+                    <span className="flex-1 text-[17px] leading-snug">{t(ins.key, { name: pname(p), ...ins.params })}</span>
+                    <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)]">→</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="card card-accent-pink p-8 flex flex-col">
+          <span className="eyebrow">{t('dashboard.predicted')}</span>
+          <div className="metric text-[60px] mt-6">{inr(Math.round(sum.predictedNext7 / 10) * 10)}</div>
+          {sum.predictedChangePct !== null && <p className="text-[18px] font-semibold mt-3">{t('dashboard.vsThisWeek', { pct: pct(sum.predictedChangePct) })}</p>}
+          <p className="mt-auto pt-8 text-[15px] leading-snug">{t('dashboard.predictedSub')}</p>
+        </div>
+      </section>
+
+      {/* ── Fast / slow / run out ── */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <ListCard title={t('dashboard.fast')} tag="7d">
+          {sum.fast.map(({ p, s }, i) => (
+            <div key={p.id} className={`flex items-center justify-between gap-3 py-3 ${i ? 'border-t border-[var(--border)]' : ''}`}>
+              <span className="font-medium truncate">{pname(p)}</span>
+              <span className="font-mono text-sm text-[var(--text-secondary)] whitespace-nowrap">{t('dashboard.perDay', { n: s.avg7.toFixed(1) })}</span>
+            </div>
+          ))}
+        </ListCard>
+        <ListCard title={t('dashboard.slow')} tag="7d">
+          {sum.slow.map(({ p, s }, i) => (
+            <div key={p.id} className={`flex items-center justify-between gap-3 py-3 ${i ? 'border-t border-[var(--border)]' : ''}`}>
+              <span className="font-medium truncate">{pname(p)}</span>
+              <span className="font-mono text-sm text-[var(--text-secondary)] whitespace-nowrap">{t('dashboard.perDay', { n: s.avg7.toFixed(1) })}</span>
+            </div>
+          ))}
+        </ListCard>
+        <ListCard title={t('dashboard.runOut')}>
+          {sum.runOut.length === 0 && <p className="text-[var(--text-secondary)]">{t('dashboard.allGood')}</p>}
+          {sum.runOut.slice(0, 5).map(({ p, s }, i) => (
+            <Link key={p.id} to={`/inventory?focus=${p.id}`} className={`flex items-center justify-between gap-3 py-3 ${i ? 'border-t border-[var(--border)]' : ''}`}>
+              <span className="font-medium truncate">{pname(p)}</span>
+              <span className={`badge ${s.daysLeft < 1.5 ? 'badge-danger' : 'badge-warning'}`}>{daysText(s.daysLeft)}</span>
+            </Link>
+          ))}
+        </ListCard>
+      </section>
+
+      {/* ── Replenishment + low stock ── */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-6 mb-6">
+        <div className="card overflow-hidden">
+          <div className="p-7 pb-4 flex flex-wrap items-center justify-between gap-4">
+            <span className="eyebrow">{t('dashboard.replenish')}</span>
+            {sum.replenish.length > 0 && <button className="btn btn-primary btn-sm" onClick={orderAll}>{t('dashboard.orderAll')}</button>}
+          </div>
+          {sum.replenish.length === 0 ? <p className="px-7 pb-7 text-[var(--text-secondary)]">{t('dashboard.allGood')}</p> : (
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead><tr><th>{t('common.product')}</th><th>{t('common.stock')}</th><th>{t('inventory.trendLabel')}</th><th>{t('inventory.daysLeft')}</th><th>{t('inventory.recommendedOrder')}</th></tr></thead>
+                <tbody>
+                  {sum.replenish.map(({ p, s }) => (
+                    <tr key={p.id} className="cursor-pointer" onClick={() => navigate(`/inventory?focus=${p.id}`)}>
+                      <td className="font-medium">{pname(p)}</td>
+                      <td className="font-mono">{p.quantity} <span className="text-[var(--text-muted)] text-xs">/ {p.min}</span></td>
+                      <td><TrendMark trend={s.trend} /></td>
+                      <td>{daysText(s.daysLeft)}</td>
+                      <td className="font-mono font-semibold">+{s.recommendedQty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Full Inventory Table */}
-      <div className="card overflow-hidden">
-        <div className="p-5 border-b border-[var(--border)]">
-          <h3 className="card-title">📋 Full Inventory</h3>
+        <div className="card p-7 flex flex-col">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="eyebrow">{t('dashboard.lowStock')}</span>
+              <p className="text-sm text-[var(--text-muted)] mt-1">{t('dashboard.lowStockSub')}</p>
+            </div>
+            <span className="metric text-[52px]">{lowStockProducts.length}</span>
+          </div>
+          <div className="mt-5 space-y-2">
+            {lowStockProducts.length === 0 && <p className="text-[var(--text-secondary)]">{t('dashboard.allGood')}</p>}
+            {lowStockProducts.slice(0, 5).map(p => (
+              <Link key={p.id} to={`/inventory?focus=${p.id}`} className="flex items-center justify-between rounded-2xl bg-[var(--surface-2)] px-4 py-3">
+                <span className="font-medium truncate pr-3">{pname(p)}</span>
+                <span className={`font-mono text-sm ${p.quantity <= 0 ? 'text-[var(--danger)]' : 'text-[var(--warning)]'}`}>{p.quantity}/{p.min}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-auto pt-6 flex items-center justify-between text-sm">
+            <span className="eyebrow">{t('dashboard.stockHealth')}</span>
+            <span className="font-mono">{Math.round((healthy / Math.max(1, products.length)) * 100)}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-[var(--surface-2)] mt-2 overflow-hidden">
+            <div className="h-full rounded-full bg-[var(--accent-blue)]" style={{ width: `${(healthy / Math.max(1, products.length)) * 100}%` }} />
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Barcode</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => (
-                <tr key={p.id}>
-                  <td className="font-semibold">{p.name}</td>
-                  <td className="font-mono text-xs text-[var(--text-muted)]">{p.barcode}</td>
-                  <td><span className="badge badge-info">{p.category}</span></td>
-                  <td className="font-bold">₹{p.price}</td>
-                  <td className="font-bold">{p.quantity}</td>
-                  <td>
-                    {p.quantity <= p.reorderLevel ? (
-                      p.quantity <= 5 ? <span className="badge badge-danger">Critical</span> : <span className="badge badge-warning">Low</span>
-                    ) : <span className="badge badge-success">OK</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      </section>
+
+      {/* ── Recent bills ── */}
+      <section className="card p-7">
+        <span className="eyebrow">{t('dashboard.recentBills')}</span>
+        {bills.length === 0 ? <p className="mt-4 text-[var(--text-secondary)]">{t('dashboard.noBills')}</p> : (
+          <div className="mt-4 divide-y divide-[var(--border)]">
+            {bills.slice(0, 6).map(b => (
+              <div key={b.id} className="flex items-center gap-4 py-3 text-sm">
+                <span className="font-mono text-[var(--text-secondary)] w-16">#{b.billNo}</span>
+                <span className="text-[var(--text-muted)] w-20">{fmtTime(b.date)}</span>
+                <span className="flex-1 truncate">{b.items.map(i => `${pname(i)} ×${i.qty}`).join(', ')}</span>
+                <span className="font-semibold">{inr(b.total)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
