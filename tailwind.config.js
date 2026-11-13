@@ -8,7 +8,7 @@ module.exports = {
       // NEW: Add fonts from your prompt
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Poppins', 'Inter', 'sans-serif'],
+        display: ['Inter Tight', 'Inter', 'Noto Sans Telugu', 'Noto Sans Devanagari', 'sans-serif'],
       },
       // Animation for background (if needed)
       keyframes: {
