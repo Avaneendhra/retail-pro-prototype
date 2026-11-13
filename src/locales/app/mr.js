@@ -1,7 +1,7 @@
 export default {
   langName: 'मराठी',
-  nav: { newSale: 'नवीन विक्री', dashboard: 'डॅशबोर्ड', inventory: 'स्टॉक', invoices: 'इनव्हॉइस', orders: 'ऑर्डर', addStock: 'स्टॉक जोडा',
-    short: { newSale: 'विक्री', dashboard: 'होम', inventory: 'स्टॉक', invoices: 'इनव्हॉइस', orders: 'ऑर्डर' } },
+  nav: { newSale: 'होम', dashboard: 'डॅशबोर्ड', inventory: 'स्टॉक', invoices: 'इनव्हॉइस', orders: 'ऑर्डर', addStock: 'वस्तू जोडा',
+    short: { newSale: 'होम', dashboard: 'आकडे', inventory: 'स्टॉक', addStock: 'जोडा', invoices: 'इनव्हॉइस', orders: 'ऑर्डर' } },
   common: {
     cancel: 'रद्द करा', confirm: 'खात्री करा', close: 'बंद करा', save: 'सेव्ह करा', delete: 'हटवा', edit: 'बदला', back: 'मागे', search: 'शोधा',
     online: 'ऑनलाइन', offline: 'ऑफलाइन', units: 'नग', unitsShort: 'न', perDay: '/ दिवस', days: 'दिवस', day: 'दिवस', today: 'आज',
@@ -17,7 +17,7 @@ export default {
     lowAlert: '{{name}}: {{qty}} शिल्लक (किमान {{min}})', openInventory: 'स्टॉक उघडा' },
 
   billing: {
-    title: 'नवीन विक्री', billNo: 'बिल #{{no}}',
+    title: 'होम', billNo: 'नवीन विक्री · बिल #{{no}}',
     quick: 'पटकन जोडा', quickHint: 'जोडण्यासाठी वस्तूवर टॅप करा',
     search: 'शोधा', searchPlaceholder: 'वस्तूचे नाव, ID किंवा कोड', noResults: 'जुळणारी वस्तू नाही',
     codeEntry: 'कोड एंट्री', codePlaceholder: 'ML 2  किंवा  P1025', codeHint: 'कोड किंवा ID, हवे तर नग, लिहून Enter दाबा',
@@ -55,7 +55,7 @@ export default {
 
   inventory: {
     title: 'स्टॉक', subtitle: 'स्टॉकवर आपोआप लक्ष ठेवले जाते. ज्या वस्तूंकडे लक्ष द्यायचे आहे त्या आधी दिसतात.',
-    totalProducts: 'वस्तू', stockValue: 'स्टॉक मूल्य', needAttention: 'लक्ष द्या', addStock: 'स्टॉक जोडा',
+    totalProducts: 'वस्तू', stockValue: 'स्टॉक मूल्य', needAttention: 'लक्ष द्या', addStock: 'वस्तू जोडा',
     searchPlaceholder: 'नाव, कोड किंवा ID शोधा', allCategories: 'सर्व प्रकार', sortAttention: 'लक्ष द्या', sortName: 'नाव', sortStock: 'स्टॉक',
     current: 'सध्याचा स्टॉक', minimum: 'किमान स्टॉक', avgDaily: 'रोजची सरासरी विक्री', trendLabel: 'मागणीचा कल', predicted: 'अंदाजित मागणी',
     daysLeft: 'साधारण पुरेल', recommendation: 'सूचना', recommendedOrder: 'सुचवलेली ऑर्डर',
@@ -109,14 +109,20 @@ export default {
   },
 
   addStock: {
-    title: 'स्टॉक जोडा', subtitle: 'लेबल किंवा बारकोड स्कॅन करा, किंवा वस्तू हाताने भरा.',
-    labelScan: 'लेबल स्कॅन', barcode: 'बारकोड', manual: 'हाताने',
-    labelHint: 'लेबलकडे धरा, मग फोटो काढा', startCamera: 'कॅमेरा सुरू करा', capture: 'फोटो काढा', stop: 'थांबवा',
-    reading: 'लेबल वाचत आहे…', startScanner: 'स्कॅनर सुरू करा', scanning: 'स्कॅन होत आहे',
-    manualTitle: 'हाताने भरा', name: 'वस्तूचे नाव', price: 'किंमत (₹)', quantity: 'नग', addToInventory: 'स्टॉकमध्ये जोडा',
-    recent: 'अलीकडे जोडलेले', newBadge: 'नवीन', stockBadge: '+स्टॉक', lastRead: 'शेवटचे वाचलेले',
-    toastAdded: '{{name}} स्टॉकमध्ये जोडले', toastPlusOne: '+1 {{name}} स्टॉकमध्ये जोडले', toastUnknown: 'बारकोड {{code}} जोडला. माहिती स्टॉक पानावर बदला.',
-    errCamera: 'कॅमेरा परवानगी मिळाली नाही. कृपया कॅमेरा परवानगी द्या.', errRead: 'लेबल वाचता आले नाही. चांगल्या प्रकाशात प्रयत्न करा.', errName: 'नाव आवश्यक आहे',
+    title: 'वस्तू जोडा', subtitle: 'कॅमेरा वस्तूकडे धरा. एकच स्कॅनर बारकोड आणि लेबल दोन्ही वाचतो, मग तपासण्यासाठी माहिती दाखवतो.',
+    startCamera: 'कॅमेरा सुरू करा', stop: 'थांबवा', scan: 'वस्तू स्कॅन करा', upload: 'फोटो अपलोड करा', manual: 'हाताने भरा',
+    looking: 'बारकोड शोधत आहे…', stageBarcode: 'बारकोड वाचत आहे…', stageLookup: 'वस्तूची माहिती शोधत आहे…', stageLabel: 'लेबल वाचत आहे…',
+    tip: 'वस्तू 15–25 सेमी अंतरावर, चांगल्या प्रकाशात, बारकोड किंवा पुढचे लेबल फ्रेममध्ये येईल असे धरा. बारकोड आपोआप वाचला जातो; लेबलसाठी स्कॅन दाबा.',
+    engineClaude: 'लेबल वाचन: Claude', engineOcr: 'लेबल वाचन: याच डिव्हाइसवर',
+    empty: 'माहिती इथे पाहण्यासाठी वस्तू स्कॅन करा.',
+    reviewTitle: 'माहिती तपासा', existingTitle: 'आधीच तुमच्या स्टॉकमध्ये आहे', newProduct: 'नवीन वस्तू',
+    sources: { barcode: 'बारकोड', database: 'उत्पादन डेटाबेस', label: 'लेबल', claude: 'Claude', catalog: 'तुमचा स्टॉक' },
+    name: 'वस्तूचे नाव', price: 'विक्री किंमत (₹)', mrpHint: 'लेबलवरून वाचलेली MRP', barcodeField: 'बारकोड', code: 'छोटा कोड', min: 'किमान स्टॉक', quantity: 'नग',
+    add: 'स्टॉकमध्ये जोडा', addQty: 'स्टॉकमध्ये {{qty}} जोडा', discard: 'रद्द करा', mrpDiffers: 'लेबलवर MRP {{mrp}} आहे. किंमत बदलली असल्यास स्टॉक पानावर बदला.',
+    notFound: 'उत्पादन डेटाबेसमध्ये नाही. माहिती लेबलवरून वाचली आहे, कृपया तपासा.', noDetails: 'माहिती वाचता आली नाही. कृपया भरा.',
+    recent: 'या वेळी जोडलेले', newBadge: 'नवीन', stockBadge: '+स्टॉक',
+    toastAdded: '{{name}} स्टॉकमध्ये जोडले', toastStock: '+{{qty}} {{name}} स्टॉकमध्ये जोडले',
+    errCamera: 'कॅमेरा परवानगी मिळाली नाही. कृपया कॅमेरा परवानगी द्या.', errRead: 'ही वस्तू वाचता आली नाही. चांगल्या प्रकाशात प्रयत्न करा किंवा हाताने भरा.', errName: 'नाव आवश्यक आहे', errPrice: 'विक्री किंमत भरा',
   },
 
   settings: {

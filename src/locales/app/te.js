@@ -1,7 +1,7 @@
 export default {
   langName: 'తెలుగు',
-  nav: { newSale: 'కొత్త అమ్మకం', dashboard: 'డాష్‌బోర్డ్', inventory: 'స్టాక్', invoices: 'ఇన్వాయిస్‌లు', orders: 'ఆర్డర్లు', addStock: 'స్టాక్ జోడించు',
-    short: { newSale: 'అమ్మకం', dashboard: 'హోమ్', inventory: 'స్టాక్', invoices: 'ఇన్వాయిస్', orders: 'ఆర్డర్లు' } },
+  nav: { newSale: 'హోమ్', dashboard: 'డాష్‌బోర్డ్', inventory: 'స్టాక్', invoices: 'ఇన్వాయిస్‌లు', orders: 'ఆర్డర్లు', addStock: 'వస్తువు జోడించు',
+    short: { newSale: 'హోమ్', dashboard: 'గణాంకాలు', inventory: 'స్టాక్', addStock: 'జోడించు', invoices: 'ఇన్వాయిస్', orders: 'ఆర్డర్లు' } },
   common: {
     cancel: 'రద్దు', confirm: 'నిర్ధారించు', close: 'మూసివేయి', save: 'సేవ్ చేయి', delete: 'తొలగించు', edit: 'మార్చు', back: 'వెనక్కి', search: 'వెతుకు',
     online: 'ఆన్‌లైన్', offline: 'ఆఫ్‌లైన్', units: 'యూనిట్లు', unitsShort: 'యూ', perDay: '/ రోజు', days: 'రోజులు', day: 'రోజు', today: 'ఈరోజు',
@@ -17,7 +17,7 @@ export default {
     lowAlert: '{{name}}: {{qty}} మిగిలాయి (కనిష్ఠం {{min}})', openInventory: 'స్టాక్ తెరువు' },
 
   billing: {
-    title: 'కొత్త అమ్మకం', billNo: 'బిల్ #{{no}}',
+    title: 'హోమ్', billNo: 'కొత్త అమ్మకం · బిల్ #{{no}}',
     quick: 'త్వరగా జోడించు', quickHint: 'జోడించడానికి వస్తువుపై నొక్కండి',
     search: 'వెతుకు', searchPlaceholder: 'వస్తువు పేరు, ID లేదా కోడ్', noResults: 'సరిపోలే వస్తువులు లేవు',
     codeEntry: 'కోడ్ ఎంట్రీ', codePlaceholder: 'ML 2  లేదా  P1025', codeHint: 'కోడ్ లేదా ID, కావాలంటే సంఖ్య టైప్ చేసి Enter నొక్కండి',
@@ -55,7 +55,7 @@ export default {
 
   inventory: {
     title: 'స్టాక్', subtitle: 'స్టాక్‌ను ఆటోమేటిక్‌గా గమనిస్తాం. శ్రద్ధ అవసరమైన వస్తువులు ముందు చూపబడతాయి.',
-    totalProducts: 'వస్తువులు', stockValue: 'స్టాక్ విలువ', needAttention: 'శ్రద్ధ అవసరం', addStock: 'స్టాక్ జోడించు',
+    totalProducts: 'వస్తువులు', stockValue: 'స్టాక్ విలువ', needAttention: 'శ్రద్ధ అవసరం', addStock: 'వస్తువు జోడించు',
     searchPlaceholder: 'పేరు, కోడ్ లేదా ID వెతకండి', allCategories: 'అన్ని వర్గాలు', sortAttention: 'శ్రద్ధ అవసరం', sortName: 'పేరు', sortStock: 'స్టాక్',
     current: 'ప్రస్తుత స్టాక్', minimum: 'కనిష్ఠ స్టాక్', avgDaily: 'రోజువారీ సగటు అమ్మకం', trendLabel: 'డిమాండ్ ధోరణి', predicted: 'అంచనా డిమాండ్',
     daysLeft: 'సుమారు సరిపోతుంది', recommendation: 'సూచన', recommendedOrder: 'సూచించిన ఆర్డర్',
@@ -109,14 +109,20 @@ export default {
   },
 
   addStock: {
-    title: 'స్టాక్ జోడించు', subtitle: 'లేబుల్ లేదా బార్‌కోడ్ స్కాన్ చేయండి, లేదా వస్తువును చేతితో నమోదు చేయండి.',
-    labelScan: 'లేబుల్ స్కాన్', barcode: 'బార్‌కోడ్', manual: 'చేతితో',
-    labelHint: 'లేబుల్ వైపు చూపించి ఫోటో తీయండి', startCamera: 'కెమెరా ప్రారంభించు', capture: 'ఫోటో తీయి', stop: 'ఆపు',
-    reading: 'లేబుల్ చదువుతోంది…', startScanner: 'స్కానర్ ప్రారంభించు', scanning: 'స్కాన్ చేస్తోంది',
-    manualTitle: 'చేతితో నమోదు', name: 'వస్తువు పేరు', price: 'ధర (₹)', quantity: 'సంఖ్య', addToInventory: 'స్టాక్‌కు జోడించు',
-    recent: 'ఇటీవల జోడించినవి', newBadge: 'కొత్త', stockBadge: '+స్టాక్', lastRead: 'చివరిగా చదివినది',
-    toastAdded: '{{name}} స్టాక్‌కు జోడించబడింది', toastPlusOne: '+1 {{name}} స్టాక్‌కు జోడించబడింది', toastUnknown: 'బార్‌కోడ్ {{code}} జోడించబడింది. వివరాలు స్టాక్ పేజీలో మార్చండి.',
-    errCamera: 'కెమెరా అనుమతి లేదు. దయచేసి కెమెరా అనుమతి ఇవ్వండి.', errRead: 'లేబుల్ చదవలేకపోయాం. మంచి వెలుతురులో ప్రయత్నించండి.', errName: 'పేరు తప్పనిసరి',
+    title: 'వస్తువు జోడించు', subtitle: 'కెమెరాను వస్తువు వైపు ఉంచండి. ఒకే స్కానర్ బార్‌కోడ్‌ను, లేబుల్‌ను కలిపి చదివి, సరిచూడడానికి వివరాలు చూపిస్తుంది.',
+    startCamera: 'కెమెరా ప్రారంభించు', stop: 'ఆపు', scan: 'వస్తువు స్కాన్', upload: 'ఫోటో అప్‌లోడ్', manual: 'చేతితో నమోదు',
+    looking: 'బార్‌కోడ్ కోసం వెతుకుతోంది…', stageBarcode: 'బార్‌కోడ్ చదువుతోంది…', stageLookup: 'వస్తువు వివరాలు వెతుకుతోంది…', stageLabel: 'లేబుల్ చదువుతోంది…',
+    tip: 'వస్తువును 15–25 సెం.మీ. దూరంలో మంచి వెలుతురులో, బార్‌కోడ్ లేదా ముందు లేబుల్ ఫ్రేమ్ లోపల ఉండేలా పట్టుకోండి. బార్‌కోడ్ ఆటోమేటిక్‌గా చదవబడుతుంది; లేబుల్ కోసం స్కాన్ నొక్కండి.',
+    engineClaude: 'లేబుల్ చదవడం: Claude', engineOcr: 'లేబుల్ చదవడం: ఈ పరికరంలో',
+    empty: 'వివరాలు ఇక్కడ చూడడానికి వస్తువును స్కాన్ చేయండి.',
+    reviewTitle: 'వివరాలు సరిచూడండి', existingTitle: 'ఇప్పటికే మీ స్టాక్‌లో ఉంది', newProduct: 'కొత్త వస్తువు',
+    sources: { barcode: 'బార్‌కోడ్', database: 'ఉత్పత్తి డేటాబేస్', label: 'లేబుల్', claude: 'Claude', catalog: 'మీ స్టాక్' },
+    name: 'వస్తువు పేరు', price: 'అమ్మకం ధర (₹)', mrpHint: 'లేబుల్ నుండి చదివిన MRP', barcodeField: 'బార్‌కోడ్', code: 'చిన్న కోడ్', min: 'కనిష్ఠ స్టాక్', quantity: 'సంఖ్య',
+    add: 'స్టాక్‌కు జోడించు', addQty: 'స్టాక్‌కు {{qty}} జోడించు', discard: 'వదిలేయి', mrpDiffers: 'లేబుల్‌పై MRP {{mrp}} ఉంది. ధర మారితే స్టాక్ పేజీలో మార్చండి.',
+    notFound: 'ఉత్పత్తి డేటాబేస్‌లో లేదు. వివరాలు లేబుల్ నుండి చదివాం, దయచేసి సరిచూడండి.', noDetails: 'వివరాలు చదవలేకపోయాం. దయచేసి నింపండి.',
+    recent: 'ఈ సెషన్‌లో జోడించినవి', newBadge: 'కొత్త', stockBadge: '+స్టాక్',
+    toastAdded: '{{name}} స్టాక్‌కు జోడించబడింది', toastStock: '+{{qty}} {{name}} స్టాక్‌కు జోడించబడింది',
+    errCamera: 'కెమెరా అనుమతి లేదు. దయచేసి కెమెరా అనుమతి ఇవ్వండి.', errRead: 'ఈ వస్తువును చదవలేకపోయాం. మంచి వెలుతురులో ప్రయత్నించండి లేదా చేతితో నమోదు చేయండి.', errName: 'పేరు తప్పనిసరి', errPrice: 'అమ్మకం ధర నమోదు చేయండి',
   },
 
   settings: {

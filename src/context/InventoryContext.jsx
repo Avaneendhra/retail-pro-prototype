@@ -29,7 +29,13 @@ const freshMeta = () => ({ nextBill: 1025, nextPO: 101, nextSku: 1017 });
 export const InventoryProvider = ({ children }) => {
   const { showToast } = useToast() || {};
 
-  const [products, setProducts] = useState(() => load(KEYS.products, seedProducts));
+  const [products, setProducts] = useState(() => {
+    // Older saved demo data used seed barcodes with wrong check digits; fix them in place.
+    const seedById = Object.fromEntries(SEED_PRODUCTS.map(p => [p.id, p.barcode]));
+    return load(KEYS.products, seedProducts).map(p =>
+      seedById[p.id] && p.barcode !== seedById[p.id] && p.barcode.slice(0, 12) === seedById[p.id].slice(0, 12)
+        ? { ...p, barcode: seedById[p.id] } : p);
+  });
   const [sales, setSales] = useState(() => load(KEYS.sales, () => generateSalesHistory(SEED_PRODUCTS)));
   const [bills, setBills] = useState(() => load(KEYS.bills, () => []));
   const [purchaseOrders, setPurchaseOrders] = useState(() => load(KEYS.pos, () => []));

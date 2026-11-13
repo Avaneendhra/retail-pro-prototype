@@ -6,12 +6,14 @@ import { useInventory } from '../../context/InventoryContext';
 import { LANGUAGES } from '../../i18n';
 import { pname } from '../../lib/format';
 import SettingsModal from './SettingsModal';
+import Logo from './Logo';
 
 const I = {
   sale: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 7h6m-6 4h6m-6 4h3M6 3h12v18l-3-2-3 2-3-2-3 2V3z" /></svg>,
   home: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5h6v6H4zM14 5h6v4h-6zM14 13h6v6h-6zM4 15h6v4H4z" /></svg>,
   stock: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>,
   invoice: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6" /></svg>,
+  add: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2M12 8v8M8 12h8" /></svg>,
   orders: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7h13v10H3zM16 10h3l2 3v4h-5M7 20a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z" /></svg>,
   sun: <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth={1.8} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.4 6.4l-.7-.7M6.3 6.3l-.7-.7m12.8 0l-.7.7M6.3 17.7l-.7.7M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
   moon: <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20.4 15.4A9 9 0 018.6 3.6 9 9 0 1020.4 15.4z" /></svg>,
@@ -22,9 +24,10 @@ const I = {
 };
 
 const NAV = [
-  { path: '/billing', key: 'newSale', icon: I.sale },
+  { path: '/home', key: 'newSale', icon: I.sale },
   { path: '/dashboard', key: 'dashboard', icon: I.home },
   { path: '/inventory', key: 'inventory', icon: I.stock },
+  { path: '/add-stock', key: 'addStock', icon: I.add },
   { path: '/invoices', key: 'invoices', icon: I.invoice },
   { path: '/orders', key: 'orders', icon: I.orders },
 ];
@@ -111,11 +114,8 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <header className="topbar no-print">
-        <Link to="/billing" className="topbar-brand">
-          <span className="brand-mark">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-          </span>
-          <span>Smart Retail</span>
+        <Link to="/home" className="topbar-brand" aria-label="stokd home">
+          <Logo />
         </Link>
 
         <nav className="pill-nav" aria-label="Main">

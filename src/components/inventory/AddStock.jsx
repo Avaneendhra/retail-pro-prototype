@@ -1,378 +1,419 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import Tesseract from 'tesseract.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Html5Qrcode, Html5QrcodeSupportedFormats as F } from 'html5-qrcode';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
-import { useTranslation } from 'react-i18next';
+import { useSettings } from '../../lib/settings';
+import { inr, pname } from '../../lib/format';
+import { CATEGORIES } from '../../data/seed';
+import { downscale } from '../../lib/invoiceParser';
+import {
+  isPlausibleBarcode, lookupBarcode, parseLabelText, guessCategory, frameFromVideo, dataUrlToFile, composeName, strictMatch,
+} from '../../lib/productLookup';
 
-/* ── helpers ── */
-const extractPrice = (text) => {
-  // Match patterns: MRP ₹120, Rs. 45, Rs 99.50, MRP: 150, ₹ 200
-  const patterns = [
-    /MRP\s*[:\s]*[₹Rs.]*\s*(\d+(?:\.\d{1,2})?)/i,
-    /[₹]\s*(\d+(?:\.\d{1,2})?)/,
-    /Rs\.?\s*(\d+(?:\.\d{1,2})?)/i,
-    /Price\s*[:\s]*(\d+(?:\.\d{1,2})?)/i,
-  ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return Number(m[1]);
-  }
-  return 0;
-};
+const FORMATS = [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE];
+const READER_ID = 'unified-reader';
+const HELPER_ID = 'unified-scan-helper';
 
-const extractName = (text) => {
-  const lines = text
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l =>
-      l.length > 2 &&
-      !/^\d+$/.test(l) &&
-      !/^(mrp|price|rs|net|wt|weight|mfg|exp|batch|ingr|best|stor|contains|packed|fssai|lic)/i.test(l) &&
-      !/^\W+$/.test(l)
-    );
-  // Pick the longest line in the first 5 as most likely the product name
-  const top = lines.slice(0, 5);
-  if (!top.length) return '';
-  return top.reduce((a, b) => (a.length >= b.length ? a : b));
-};
-
-const generateId = () => 'P' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+const readFile = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 
 export default function AddStock() {
-  const { addProduct, findByBarcode } = useInventory();
-  const { showToast } = useToast();
   const { t } = useTranslation();
+  const { products, findByBarcode, byId, addProduct, receiveStock } = useInventory();
+  const { showToast } = useToast();
+  const [settings] = useSettings();
+  const useClaude = !!settings.apiKey;
 
-  const [mode, setMode] = useState('ai');          // 'ai' | 'barcode'
-  const [scanning, setScanning] = useState(false);
-  const [cameras, setCameras] = useState([]);
-  const [selectedCam, setSelectedCam] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [recentAdds, setRecentAdds] = useState([]);
-  const [lastExtracted, setLastExtracted] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', category: '', price: 0, quantity: 1 });
+  const [live, setLive] = useState(false);
+  const [stage, setStage] = useState(null);        // processing stage key
+  const [result, setResult] = useState(null);      // review draft
+  const [recent, setRecent] = useState([]);
+  const [lastCode, setLastCode] = useState('');
 
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
-  const html5QrcodeRef = useRef(null);
+  const scannerRef = useRef(null);
+  const workerRef = useRef(null);
+  const confirmRef = useRef({ code: '', count: 0 });
+  const busyRef = useRef(false);
+  const resultRef = useRef(null);
+  resultRef.current = result;
+  const fileRef = useRef(null);
 
-  useEffect(() => {
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices?.length) {
-        setCameras(devices);
-        const back = devices.find(d => /back|environment|rear/i.test(d.label));
-        setSelectedCam(back ? back.id : devices[0].id);
-      }
-    }).catch(() => {});
-    return () => stopEverything();
+
+  /* ── OCR worker (created once, reused for speed) ── */
+  const ocr = useCallback(async (dataUrl) => {
+    if (!workerRef.current) {
+      const { createWorker } = await import('tesseract.js');
+      workerRef.current = await createWorker('eng');
+    }
+    const { data } = await workerRef.current.recognize(dataUrl);
+    return data.text;
   }, []);
 
-  /* ── AI Camera (video stream) ── */
-  const startAICamera = async () => {
-    try {
-      const constraints = selectedCam
-        ? { video: { deviceId: { exact: selectedCam }, width: { ideal: 1280 }, height: { ideal: 720 } } }
-        : { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+  useEffect(() => () => {
+    workerRef.current?.terminate?.();
+    const s = scannerRef.current;
+    scannerRef.current = null;
+    if (s) s.stop().then(() => s.clear()).catch(() => {});
+  }, []);
+
+  /* ── Read the label: Claude when a key is saved, otherwise on-device OCR ── */
+  const readLabel = useCallback(async (dataUrl) => {
+    if (useClaude) {
+      try {
+        const { identifyWithClaude } = await import('../../lib/claudeProduct');
+        const r = await identifyWithClaude({ apiKey: settings.apiKey, dataUrl, products });
+        return { ...r, engine: 'claude' };
+      } catch (err) {
+        showToast(t('invoice.errClaude', { msg: err.message }), 'error');
       }
-      setScanning(true);
-    } catch {
-      showToast(t('addStock.errCamera'), 'error');
     }
-  };
-
-  const stopAICamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setScanning(false);
-  };
-
-  const captureAndExtract = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    setProcessing(true);
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/png');
-
     try {
-      const result = await Tesseract.recognize(dataUrl, 'eng');
-      const text = result.data.text;
-      const name = extractName(text);
-      const price = extractPrice(text);
+      const parsed = parseLabelText(await ocr(dataUrl));
+      return { ...parsed, category: guessCategory(parsed.name), engine: 'ocr' };
+    } catch {
+      return null;
+    }
+  }, [useClaude, settings.apiKey, products, ocr, showToast, t]);
 
-      if (!name) {
-        showToast(t('addStock.errRead'), 'error');
-        setProcessing(false);
+  /* ── Decode a barcode from a still image ── */
+  const decodeImage = useCallback(async (dataUrl) => {
+    try {
+      const helper = new Html5Qrcode(HELPER_ID, { formatsToSupport: FORMATS, verbose: false });
+      const res = await helper.scanFileV2(dataUrlToFile(dataUrl), false);
+      try { helper.clear(); } catch { /* ignore */ }
+      const fmt = res?.result?.format?.formatName || '';
+      return isPlausibleBarcode(res.decodedText, fmt) ? res.decodedText : '';
+    } catch {
+      return '';
+    }
+  }, []);
+
+  /* ── The whole pipeline: barcode + label + product databases -> one draft ── */
+  const identify = useCallback(async ({ barcode = '', dataUrl = null }) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      let code = barcode;
+      if (!code && dataUrl) { setStage('stageBarcode'); code = await decodeImage(dataUrl); }
+      if (code) setLastCode(code);
+
+      let existing = code ? findByBarcode(code) : null;
+      const sources = [];
+      if (code) sources.push('barcode');
+      if (existing) {
+        setResult({ mode: 'existing', productId: existing.id, qty: 1, sources: [...sources, 'catalog'], image: dataUrl });
         return;
       }
 
-      const product = {
-        barcode: generateId(),
+      setStage(code ? 'stageLookup' : 'stageLabel');
+      const [db, label] = await Promise.all([
+        code ? lookupBarcode(code) : Promise.resolve(null),
+        dataUrl ? readLabel(dataUrl) : Promise.resolve(null),
+      ]);
+
+      // The label can still reveal an existing product: printed barcode, Claude match, or a confident name match
+      if (!code && label?.barcode) { code = label.barcode; existing = findByBarcode(code); }
+      if (!existing && label?.matchedId) existing = byId(label.matchedId);
+      if (!existing && !db && label?.name) existing = strictMatch(products, label.name, label.size);
+      const labelSource = label?.engine === 'claude' ? 'claude' : 'label';
+      if (existing) {
+        setResult({ mode: 'existing', productId: existing.id, qty: 1, sources: [...sources, labelSource, 'catalog'], image: dataUrl, mrp: label?.mrp || 0 });
+        return;
+      }
+
+      if (db) sources.push('database');
+      if (label?.name || label?.mrp) sources.push(labelSource);
+      const name = db?.name || (label?.name ? composeName(label.brand, label.name, label.size) : '');
+      setResult({
+        mode: 'new',
         name,
-        category: '',
-        price,
-        quantity: 1,
-        reorderLevel: 10,
-      };
-
-      const res = addProduct(product);
-      showToast(t('addStock.toastAdded', { name }), 'success');
-      setRecentAdds(prev => [{ name, price, qty: 1, action: res.action, time: Date.now() }, ...prev.slice(0, 14)]);
-      setLastExtracted({ name, price, rawText: text });
-    } catch {
-      showToast(t('addStock.errRead'), 'error');
+        category: db?.category && db.category !== 'other' ? db.category : (label?.category && label.category !== 'other' ? label.category : guessCategory(name)),
+        price: label?.mrp || '',
+        mrpFromLabel: !!label?.mrp,
+        barcode: code || '',
+        code: '',
+        min: 5,
+        qty: 1,
+        image: db?.image || dataUrl,
+        sources,
+        note: !name ? 'noDetails' : (code && !db ? 'notFound' : ''),
+      });
+    } finally {
+      setStage(null);
+      busyRef.current = false;
     }
-    setProcessing(false);
-  }, [addProduct, showToast]);
+  }, [decodeImage, findByBarcode, byId, readLabel, products]);
 
-  /* ── Barcode mode ── */
-  const startBarcodeScanner = async () => {
+  /* ── Live camera: continuous barcode detection ── */
+  const onDecode = useCallback((text, res) => {
+    if (busyRef.current || resultRef.current) return;
+    const fmt = res?.result?.format?.formatName || '';
+    if (!isPlausibleBarcode(text, fmt)) return;
+    // two identical reads in a row before accepting, to avoid misreads
+    const c = confirmRef.current;
+    c.count = c.code === text ? c.count + 1 : 1;
+    c.code = text;
+    if (c.count < 2) return;
+    confirmRef.current = { code: '', count: 0 };
+    if (navigator.vibrate) navigator.vibrate(60);
+    const frame = frameFromVideo(document.querySelector(`#${READER_ID} video`));
+    try { scannerRef.current?.pause(true); } catch { /* not scanning */ }
+    identify({ barcode: text, dataUrl: frame });
+  }, [identify]);
+
+  const onDecodeRef = useRef(onDecode);
+  onDecodeRef.current = onDecode;
+
+  const start = async () => {
     try {
-      const html5Qrcode = new Html5Qrcode('add-stock-reader');
-      html5QrcodeRef.current = html5Qrcode;
-      const camConfig = selectedCam ? { deviceId: { exact: selectedCam } } : { facingMode: 'environment' };
-      await html5Qrcode.start(camConfig, {
-        fps: 10, qrbox: { width: 250, height: 250 },
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-      }, async (decodedText) => {
-        html5Qrcode.stop();
-        html5QrcodeRef.current = null;
-        setScanning(false);
-
-        const existing = findByBarcode(decodedText);
-        if (existing) {
-          addProduct({ ...existing, quantity: 1 });
-          showToast(t('addStock.toastPlusOne', { name: existing.name }), 'success');
-          setRecentAdds(prev => [{ name: existing.name, price: existing.price, qty: 1, action: 'updated', time: Date.now() }, ...prev.slice(0, 14)]);
-        } else {
-          // Try Open Food Facts
-          try {
-            const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
-            const data = await res.json();
-            if (data?.status === 1 && data.product) {
-              const name = data.product.product_name || data.product.generic_name || `Product ${decodedText}`;
-              const cat = data.product.categories ? data.product.categories.split(',')[0] : '';
-              const product = { barcode: decodedText, name, category: cat, price: 0, quantity: 1, reorderLevel: 10 };
-              addProduct(product);
-              showToast(t('addStock.toastAdded', { name }), 'success');
-              setRecentAdds(prev => [{ name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
-            } else {
-              const product = { barcode: decodedText, name: `Product ${decodedText.slice(-6)}`, category: '', price: 0, quantity: 1, reorderLevel: 10 };
-              addProduct(product);
-              showToast(t('addStock.toastUnknown', { code: decodedText }), 'success');
-              setRecentAdds(prev => [{ name: product.name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
-            }
-          } catch {
-            const product = { barcode: decodedText, name: `Product ${decodedText.slice(-6)}`, category: '', price: 0, quantity: 1, reorderLevel: 10 };
-            addProduct(product);
-            showToast(t('addStock.toastUnknown', { code: decodedText }), 'success');
-            setRecentAdds(prev => [{ name: product.name, price: 0, qty: 1, action: 'added', time: Date.now() }, ...prev.slice(0, 14)]);
-          }
-        }
-      }, () => {});
-      setScanning(true);
+      const scanner = new Html5Qrcode(READER_ID, { formatsToSupport: FORMATS, verbose: false });
+      scannerRef.current = scanner;
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 12, aspectRatio: 4 / 3,
+          qrbox: (w, h) => ({ width: Math.floor(w * 0.86), height: Math.floor(h * 0.5) }),
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        },
+        (text, res) => onDecodeRef.current(text, res),
+        () => {},
+      );
+      setLive(true);
     } catch {
+      scannerRef.current = null;
       showToast(t('addStock.errCamera'), 'error');
     }
   };
 
-  const stopEverything = async () => {
-    stopAICamera();
-    if (html5QrcodeRef.current) {
-      try { await html5QrcodeRef.current.stop(); } catch {}
-      html5QrcodeRef.current = null;
-    }
-    setScanning(false);
+  const stop = async () => {
+    const s = scannerRef.current;
+    scannerRef.current = null;
+    setLive(false);
+    if (s) { try { await s.stop(); s.clear(); } catch { /* already stopped */ } }
   };
 
-  const handleEditSave = () => {
-    if (!editForm.name.trim()) { showToast(t('addStock.errName'), 'error'); return; }
-    const product = { barcode: generateId(), name: editForm.name, category: editForm.category, price: Number(editForm.price), quantity: Number(editForm.quantity), reorderLevel: 10 };
-    const res = addProduct(product);
-    showToast(t('addStock.toastAdded', { name: editForm.name }), 'success');
-    setRecentAdds(prev => [{ name: editForm.name, price: editForm.price, qty: editForm.quantity, action: res.action, time: Date.now() }, ...prev.slice(0, 14)]);
-    setEditMode(false);
-    setEditForm({ name: '', category: '', price: 0, quantity: 1 });
+  const resume = () => { try { scannerRef.current?.resume(); } catch { /* not paused */ } };
+
+  /* "Scan" — read barcode and label together from the current frame */
+  const scanNow = () => {
+    const frame = frameFromVideo(document.querySelector(`#${READER_ID} video`));
+    if (!frame) return;
+    try { scannerRef.current?.pause(true); } catch { /* ignore */ }
+    identify({ dataUrl: frame });
+  };
+
+  const onUpload = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    let url = await readFile(file);
+    try { url = await downscale(url, 1600, 0.92); } catch { /* keep original */ }
+    try { scannerRef.current?.pause(true); } catch { /* ignore */ }
+    identify({ dataUrl: url });
+  };
+
+  const discard = () => { setResult(null); resume(); };
+
+  const save = () => {
+    if (!result) return;
+    const qty = Math.max(1, parseInt(result.qty, 10) || 1);
+    if (result.mode === 'existing') {
+      const p = byId(result.productId);
+      receiveStock([{ productId: p.id, qty }]);
+      showToast(t('addStock.toastStock', { qty, name: pname(p) }), 'success');
+      setRecent(r => [{ name: pname(p), qty, isNew: false }, ...r].slice(0, 12));
+    } else {
+      const name = result.name.trim();
+      if (!name) { showToast(t('addStock.errName'), 'error'); return; }
+      if (!(Number(result.price) > 0)) { showToast(t('addStock.errPrice'), 'error'); return; }
+      if (result.barcode && findByBarcode(result.barcode)) {
+        // barcode typed by hand matches an existing product: add stock to it instead
+        const p = findByBarcode(result.barcode);
+        receiveStock([{ productId: p.id, qty }]);
+        showToast(t('addStock.toastStock', { qty, name: pname(p) }), 'success');
+      } else {
+        addProduct({
+          name, barcode: result.barcode || undefined, code: result.code.trim().toUpperCase() || undefined,
+          price: Number(result.price), category: result.category, quantity: qty, min: Number(result.min) || 5,
+        });
+        showToast(t('addStock.toastAdded', { name }), 'success');
+      }
+      setRecent(r => [{ name, qty, isNew: true }, ...r].slice(0, 12));
+    }
+    setResult(null);
+    resume();
+  };
+
+  const set = (patch) => setResult(r => ({ ...r, ...patch }));
+  const existingProduct = result?.mode === 'existing' ? byId(result.productId) : null;
+  const manual = () => {
+    try { scannerRef.current?.pause(true); } catch { /* ignore */ }
+    setResult({ mode: 'new', name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [] });
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
       <div className="page-header">
-        <h1 className="page-title flex items-center gap-3">
-          <span className="stat-icon blue"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></span>
-          {t('addStock.title')}
-        </h1>
+        <h1 className="page-title">{t('addStock.title')}</h1>
         <p className="page-subtitle">{t('addStock.subtitle')}</p>
       </div>
 
-      {/* Mode Toggle */}
-      <div className="flex gap-2 mb-6">
-        <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          {t('addStock.labelScan')}
-        </button>
-        <button onClick={() => { stopEverything(); setMode('barcode'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'barcode' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          {t('addStock.barcode')}
-        </button>
-        <button onClick={() => { stopEverything(); setEditMode(true); }} className="btn bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] py-3 text-sm font-bold">
-          {t('addStock.manual')}
-        </button>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 items-start">
+        {/* ── One scanner ── */}
+        <div className="card p-0 overflow-hidden">
+          <div className="relative bg-black aspect-[3/4] sm:aspect-[4/3] scanner-stage">
+            <div id={READER_ID} className="absolute inset-0" />
 
-      {/* Label scan Mode */}
-      {mode === 'ai' && (
-        <div className="card p-0 overflow-hidden mb-6">
-          <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between">
-            <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              {t('addStock.labelScan')}
-            </h2>
-            <span className="text-xs text-[var(--text-muted)]">{t('addStock.labelHint')}</span>
+            {!live && !stage && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--accent-blue)] text-[var(--on-accent)] flex items-center justify-center">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeWidth={1.8} d="M4 7V5a1 1 0 011-1h2M17 4h2a1 1 0 011 1v2M20 17v2a1 1 0 01-1 1h-2M7 20H5a1 1 0 01-1-1v-2M8 9v6M11 9v6M14 9v6M17 9v6" /></svg>
+                </div>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button className="btn btn-cta" onClick={start}>{t('addStock.startCamera')}</button>
+                  <button className="btn btn-ghost !text-white !bg-white/10 !border-white/20" onClick={() => fileRef.current?.click()}>{t('addStock.upload')}</button>
+                </div>
+                <p className="text-sm text-white/60 max-w-sm leading-relaxed">{t('addStock.tip')}</p>
+              </div>
+            )}
+
+            {live && !stage && !result && (
+              <span className="absolute top-4 left-4 status-pill is-online bg-black/60 backdrop-blur !border-white/10">
+                <span className="dot" />{t('addStock.looking')}
+              </span>
+            )}
+
+            {stage && (
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="w-12 h-12 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin" />
+                <p className="text-white font-semibold text-lg">{t(`addStock.${stage}`)}</p>
+                {lastCode && stage !== 'stageBarcode' && <p className="font-mono text-white/60 text-sm">{lastCode}</p>}
+              </div>
+            )}
+
+            {live && (
+              <div className="absolute bottom-0 inset-x-0 p-4 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent">
+                <button className="btn btn-sm !text-white !border-white/30 border" onClick={stop}>{t('addStock.stop')}</button>
+                <button className="btn btn-cta flex-1" onClick={scanNow} disabled={!!stage || !!result}>{t('addStock.scan')}</button>
+                <button className="icon-pill !bg-black/40 !border-white/20 !text-white" onClick={() => fileRef.current?.click()} aria-label={t('addStock.upload')} title={t('addStock.upload')}>
+                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </button>
+              </div>
+            )}
           </div>
-          <div className="relative bg-black" style={{ minHeight: '320px' }}>
-            <video ref={videoRef} className="w-full" style={{ display: scanning ? 'block' : 'none' }} playsInline muted />
-            <canvas ref={canvasRef} className="hidden" />
+          <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <span className={`badge ${useClaude ? 'badge-success' : 'badge-info'}`}>{useClaude ? t('addStock.engineClaude') : t('addStock.engineOcr')}</span>
+            <button className="text-sm font-semibold text-[var(--primary)]" onClick={manual}>{t('addStock.manual')}</button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
+          <div id={HELPER_ID} className="hidden" />
+        </div>
 
-            {!scanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[rgba(0,0,0,0.85)] p-6">
-                {cameras.length > 1 && (
-                  <select value={selectedCam} onChange={e => setSelectedCam(e.target.value)} className="form-input w-full max-w-xs text-sm py-2 bg-[var(--surface)] text-center">
-                    {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
-                  </select>
+        {/* ── Details to check ── */}
+        <div className="space-y-6">
+          {!result && (
+            <div className="card p-8 text-center text-[var(--text-secondary)]">
+              <p>{t('addStock.empty')}</p>
+            </div>
+          )}
+
+          {result && (
+            <div className="card p-6 animate-in" data-testid="scan-result">
+              <div className="flex items-start gap-4 mb-5">
+                {result.image && (
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white shrink-0 border border-[var(--border)]">
+                    <img src={result.image} alt="" className="w-full h-full object-cover" />
+                  </div>
                 )}
-                <button onClick={startAICamera} className="btn btn-primary px-8 py-4 w-full max-w-xs border-0">
-                  {t('addStock.startCamera')}
-                </button>
-                <p className="text-gray-500 text-xs text-center max-w-xs">{t('addStock.labelHint')}</p>
-              </div>
-            )}
-
-            {scanning && (
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between gap-3">
-                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">{t('addStock.stop')}</button>
-                <button onClick={captureAndExtract} disabled={processing} className="btn btn-primary text-lg px-8 py-3 flex-1 border-0 disabled:opacity-50">
-                  {processing ? (
-                    <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> {t('addStock.reading')}</span>
-                  ) : t('addStock.capture')}
-                </button>
-              </div>
-            )}
-
-            {processing && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-                <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-white font-bold">{t('addStock.reading')}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="eyebrow mb-1.5">{result.mode === 'existing' ? t('addStock.existingTitle') : t('addStock.reviewTitle')}</p>
+                  <h2 className="font-display text-[22px] font-bold tracking-tight leading-tight">
+                    {existingProduct ? pname(existingProduct) : (result.name || t('addStock.newProduct'))}
+                  </h2>
+                  {result.sources.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {result.sources.map(s => <span key={s} className="badge badge-info">{t(`addStock.sources.${s}`)}</span>)}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
 
-          {lastExtracted && (
-            <div className="p-4 bg-[var(--surface)] border-t border-[var(--border)]">
-              <p className="text-xs text-[var(--text-muted)] mb-1">{t('addStock.lastRead')}</p>
-              <p className="font-bold text-[var(--text-primary)]">{lastExtracted.name} — <span className="text-[var(--success)]">₹{lastExtracted.price}</span></p>
+              {existingProduct ? (
+                <>
+                  <dl className="grid grid-cols-3 gap-4 card-inset p-4 mb-5 text-sm">
+                    <div><dt className="eyebrow text-[10px] mb-1">{t('common.stock')}</dt><dd className="font-mono font-semibold">{existingProduct.quantity}</dd></div>
+                    <div><dt className="eyebrow text-[10px] mb-1">{t('common.price')}</dt><dd className="font-mono font-semibold">{inr(existingProduct.price)}</dd></div>
+                    <div><dt className="eyebrow text-[10px] mb-1">{t('common.code')}</dt><dd className="font-mono font-semibold">{existingProduct.code}</dd></div>
+                  </dl>
+                  {result.mrp > 0 && result.mrp !== existingProduct.price && (
+                    <p className="text-sm text-[var(--warning)] mb-4">{t('addStock.mrpDiffers', { mrp: inr(result.mrp) })}</p>
+                  )}
+                </>
+              ) : (
+                <div className="grid grid-cols-2 gap-4 mb-5">
+                  <div className="col-span-2">
+                    <label className="field-label" htmlFor="as-name">{t('addStock.name')}</label>
+                    <input id="as-name" className="form-input" value={result.name} onChange={e => set({ name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="as-price">{t('addStock.price')}</label>
+                    <input id="as-price" className="form-input font-mono" inputMode="decimal" value={result.price} onChange={e => set({ price: e.target.value.replace(/[^\d.]/g, ''), mrpFromLabel: false })} />
+                    {result.mrpFromLabel && <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.mrpHint')}</p>}
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="as-cat">{t('common.category')}</label>
+                    <select id="as-cat" className="form-input" value={result.category} onChange={e => set({ category: e.target.value })}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="as-bc">{t('addStock.barcodeField')}</label>
+                    <input id="as-bc" className="form-input font-mono" inputMode="numeric" value={result.barcode} onChange={e => set({ barcode: e.target.value.trim() })} />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="as-code">{t('addStock.code')}</label>
+                    <input id="as-code" className="form-input font-mono uppercase" placeholder={(result.name || '').replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase()} value={result.code} onChange={e => set({ code: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="field-label" htmlFor="as-min">{t('addStock.min')}</label>
+                    <input id="as-min" className="form-input font-mono" inputMode="numeric" value={result.min} onChange={e => set({ min: e.target.value.replace(/\D/g, '') })} />
+                  </div>
+                </div>
+              )}
+
+              {result.note && <p className="text-sm text-[var(--text-secondary)] mb-4">{t(`addStock.${result.note}`)}</p>}
+
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="w-32">
+                  <label className="field-label" htmlFor="as-qty">{t('addStock.quantity')}</label>
+                  <div className="stepper !flex w-full justify-between">
+                    <button onClick={() => setResult(r => ({ ...r, qty: Math.max(1, (parseInt(r.qty, 10) || 1) - 1) }))} aria-label="−">−</button>
+                    <input id="as-qty" value={result.qty} inputMode="numeric" onChange={e => set({ qty: e.target.value.replace(/\D/g, '') })} />
+                    <button onClick={() => setResult(r => ({ ...r, qty: (parseInt(r.qty, 10) || 0) + 1 }))} aria-label="+">+</button>
+                  </div>
+                </div>
+                <button className="btn btn-cta flex-1" onClick={save}>
+                  {result.mode === 'existing' ? t('addStock.addQty', { qty: parseInt(result.qty, 10) || 1 }) : t('addStock.add')}
+                </button>
+                <button className="btn btn-secondary" onClick={discard}>{t('addStock.discard')}</button>
+              </div>
+            </div>
+          )}
+
+          {recent.length > 0 && (
+            <div className="card p-6">
+              <h3 className="eyebrow mb-4">{t('addStock.recent')}</h3>
+              <div className="divide-y divide-[var(--border)]">
+                {recent.map((r, i) => (
+                  <div key={i} className="flex items-center gap-3 py-2.5 text-sm">
+                    <span className={`badge ${r.isNew ? 'badge-success' : 'badge-info'}`}>{r.isNew ? t('addStock.newBadge') : t('addStock.stockBadge')}</span>
+                    <span className="flex-1 truncate font-medium">{r.name}</span>
+                    <span className="font-mono text-[var(--success)]">+{r.qty}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
-      )}
-
-      {/* Barcode Mode */}
-      {mode === 'barcode' && (
-        <div className="card p-0 overflow-hidden mb-6">
-          <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
-            <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              {t('addStock.barcode')}
-            </h2>
-          </div>
-          <div className="relative bg-black" style={{ minHeight: '300px' }}>
-            <div id="add-stock-reader" className="w-full" />
-            {!scanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[rgba(0,0,0,0.85)] p-6">
-                {cameras.length > 1 && (
-                  <select value={selectedCam} onChange={e => setSelectedCam(e.target.value)} className="form-input w-full max-w-xs text-sm py-2 bg-[var(--surface)] text-center">
-                    {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
-                  </select>
-                )}
-                <button onClick={startBarcodeScanner} className="btn btn-primary px-8 py-3 w-full max-w-xs">
-                  {t('addStock.startScanner')}
-                </button>
-              </div>
-            )}
-            {scanning && (
-              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">{t('addStock.scanning')}</span>
-                <button onClick={stopEverything} className="btn btn-danger btn-sm">{t('addStock.stop')}</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Manual entry Modal */}
-      {editMode && (
-        <div className="card p-6 mb-6 border-2 border-[var(--primary)]">
-          <h2 className="font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">{t('addStock.manualTitle')}</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.name')} *</label>
-              <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} placeholder="Maggi Noodles" className="form-input-no-icon" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('common.category')}</label>
-                <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} placeholder="—" className="form-input-no-icon" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.price')}</label>
-                <input type="number" min="0" step="0.01" value={editForm.price} onChange={e => setEditForm(p => ({ ...p, price: e.target.value }))} className="form-input-no-icon font-bold" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t('addStock.quantity')}</label>
-              <input type="number" min="1" value={editForm.quantity} onChange={e => setEditForm(p => ({ ...p, quantity: e.target.value }))} className="form-input-no-icon text-lg font-bold text-center" />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={handleEditSave} className="btn btn-primary flex-1 py-3">{t('addStock.addToInventory')}</button>
-              <button onClick={() => setEditMode(false)} className="btn bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)] px-6 py-3">{t('common.cancel')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recently added Feed */}
-      {recentAdds.length > 0 && (
-        <div className="card p-5">
-          <h3 className="font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            {t('addStock.recent')} ({recentAdds.length})
-          </h3>
-          <div className="space-y-2">
-            {recentAdds.map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--primary)] transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className={`badge ${item.action === 'added' ? 'badge-success' : 'badge-info'}`}>{item.action === 'added' ? t('addStock.newBadge') : t('addStock.stockBadge')}</span>
-                  <div>
-                    <span className="font-medium text-[var(--text-primary)]">{item.name}</span>
-                    {item.price > 0 && <span className="text-xs text-[var(--text-muted)] ml-2">₹{item.price}</span>}
-                  </div>
-                </div>
-                <span className="font-bold text-[var(--success)]">+{item.qty}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

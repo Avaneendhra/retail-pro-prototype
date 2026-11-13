@@ -1,7 +1,7 @@
 export default {
   langName: 'English',
-  nav: { newSale: 'New Sale', dashboard: 'Dashboard', inventory: 'Inventory', invoices: 'Invoices', orders: 'Orders', addStock: 'Add Stock',
-    short: { newSale: 'Sale', dashboard: 'Home', inventory: 'Stock', invoices: 'Invoice', orders: 'Orders' } },
+  nav: { newSale: 'Home', dashboard: 'Dashboard', inventory: 'Inventory', invoices: 'Invoices', orders: 'Orders', addStock: 'Add Product',
+    short: { newSale: 'Home', dashboard: 'Stats', inventory: 'Stock', addStock: 'Add', invoices: 'Invoice', orders: 'Orders' } },
   common: {
     cancel: 'Cancel', confirm: 'Confirm', close: 'Close', save: 'Save', delete: 'Delete', edit: 'Edit', back: 'Back', search: 'Search',
     online: 'Online', offline: 'Offline', units: 'units', unitsShort: 'u', perDay: '/ day', days: 'days', day: 'day', today: 'Today',
@@ -17,7 +17,7 @@ export default {
     lowAlert: '{{name}}: {{qty}} left (min {{min}})', openInventory: 'Open inventory' },
 
   billing: {
-    title: 'New Sale', billNo: 'Bill #{{no}}',
+    title: 'Home', billNo: 'New sale · Bill #{{no}}',
     quick: 'Quick add', quickHint: 'Tap a product to add it',
     search: 'Search', searchPlaceholder: 'Product name, ID or code', noResults: 'No matching products',
     codeEntry: 'Code entry', codePlaceholder: 'ML 2  or  P1025', codeHint: 'Type a code or product ID, optional quantity, then Enter',
@@ -55,7 +55,7 @@ export default {
 
   inventory: {
     title: 'Inventory', subtitle: 'Stock is watched automatically. Products that need attention are shown first.',
-    totalProducts: 'Products', stockValue: 'Stock value', needAttention: 'Need attention', addStock: 'Add stock',
+    totalProducts: 'Products', stockValue: 'Stock value', needAttention: 'Need attention', addStock: 'Add product',
     searchPlaceholder: 'Search name, code or ID', allCategories: 'All categories', sortAttention: 'Needs attention', sortName: 'Name', sortStock: 'Stock',
     current: 'Current stock', minimum: 'Minimum stock', avgDaily: 'Average daily sales', trendLabel: 'Demand trend', predicted: 'Predicted demand',
     daysLeft: 'Lasts about', recommendation: 'Recommendation', recommendedOrder: 'Recommended order',
@@ -109,14 +109,20 @@ export default {
   },
 
   addStock: {
-    title: 'Add Stock', subtitle: 'Scan a label or barcode, or enter a product by hand.',
-    labelScan: 'Label scan', barcode: 'Barcode', manual: 'Manual',
-    labelHint: 'Point at the label, then capture', startCamera: 'Start camera', capture: 'Capture', stop: 'Stop',
-    reading: 'Reading the label…', startScanner: 'Start scanner', scanning: 'Scanning',
-    manualTitle: 'Manual entry', name: 'Product name', price: 'Price (₹)', quantity: 'Quantity', addToInventory: 'Add to inventory',
-    recent: 'Recently added', newBadge: 'New', stockBadge: '+Stock', lastRead: 'Last read',
-    toastAdded: 'Added {{name}} to inventory', toastPlusOne: '+1 {{name}} added to stock', toastUnknown: 'Added barcode {{code}}. Edit details in Inventory.',
-    errCamera: 'Camera access denied. Please allow camera permission.', errRead: 'Could not read the label. Try better lighting.', errName: 'Name is required',
+    title: 'Add Product', subtitle: 'Point the camera at the product. One scanner reads the barcode and the label together, then shows the details to check.',
+    startCamera: 'Start camera', stop: 'Stop', scan: 'Scan product', upload: 'Upload photo', manual: 'Enter manually',
+    looking: 'Looking for a barcode…', stageBarcode: 'Reading the barcode…', stageLookup: 'Finding product details…', stageLabel: 'Reading the label…',
+    tip: 'Hold the product 15–25 cm away in good light, with the barcode or front label inside the frame. Barcodes are picked up automatically; tap Scan to read the label.',
+    engineClaude: 'Label reading: Claude', engineOcr: 'Label reading: on this device',
+    empty: 'Scan a product to see its details here.',
+    reviewTitle: 'Check the details', existingTitle: 'Already in your inventory', newProduct: 'New product',
+    sources: { barcode: 'Barcode', database: 'Product database', label: 'Label', claude: 'Claude', catalog: 'Your inventory' },
+    name: 'Product name', price: 'Selling price (₹)', mrpHint: 'MRP read from the label', barcodeField: 'Barcode', code: 'Short code', min: 'Minimum stock', quantity: 'Quantity',
+    add: 'Add to inventory', addQty: 'Add {{qty}} to stock', discard: 'Discard', mrpDiffers: 'Label shows MRP {{mrp}}. Update the price in Inventory if it changed.',
+    notFound: 'Not in the product database. Details were read from the label, please check them.', noDetails: 'Could not read details. Please fill them in.',
+    recent: 'Added this session', newBadge: 'New', stockBadge: '+Stock',
+    toastAdded: 'Added {{name}} to inventory', toastStock: '+{{qty}} {{name}} added to stock',
+    errCamera: 'Camera access denied. Please allow camera permission.', errRead: 'Could not read this product. Try better light or enter details by hand.', errName: 'Name is required', errPrice: 'Enter a selling price',
   },
 
   settings: {

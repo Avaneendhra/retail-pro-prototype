@@ -58,7 +58,7 @@ export default function Dashboard() {
           <h1 className="display-xl">{t('dashboard.heroTitle1')}<br />{t('dashboard.heroTitle2')}<br />{t('dashboard.heroTitle3')}</h1>
           <p className="text-[var(--text-secondary)] text-lg leading-relaxed max-w-md mt-8">{t('dashboard.heroSub')}</p>
           <div className="flex flex-wrap gap-3 mt-10">
-            <Link to="/billing" className="btn btn-cta">{t('dashboard.startSale')}</Link>
+            <Link to="/home" className="btn btn-cta">{t('dashboard.startSale')}</Link>
             <Link to="/inventory" className="btn btn-ghost">{t('dashboard.viewStock')}</Link>
           </div>
         </div>

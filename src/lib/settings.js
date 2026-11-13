@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 // Tiny settings store in localStorage, shared across components.
 const KEY = 'sr2_settings';
-const DEFAULTS = { apiKey: '', shopName: 'Smart Retail' };
+const DEFAULTS = { apiKey: '', shopName: 'My Store' };
 const listeners = new Set();
 
 export function getSettings() {

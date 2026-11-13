@@ -19,9 +19,9 @@ export default defineConfig({
         clientsClaim: true
       },
       manifest: {
-        name: 'Smart Retail Pro',
-        short_name: 'RetailPro',
-        description: 'Smart Billing & Inventory Management System',
+        name: 'stokd',
+        short_name: 'stokd',
+        description: 'Billing and inventory for small shops',
         theme_color: '#0D0D0D',
         icons: [
           {

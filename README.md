@@ -1,11 +1,11 @@
-# Smart Retail
+# stokd.
 
 Inventory for small retail stores. Add or deduct stock by scan, forecast demand from sales, and see low stock before it runs out.
 
 [Live demo](https://avaneendhra.github.io/retail-pro-prototype/) · [Run locally](#run-locally)
 
 <a href="https://avaneendhra.github.io/retail-pro-prototype/">
-  <img src="docs/dashboard.jpg" alt="Smart Retail dashboard" width="900" />
+  <img src="docs/dashboard.jpg" alt="stokd dashboard" width="900" />
 </a>
 
 ## Try it
@@ -18,7 +18,8 @@ Open it on a phone to use the camera for barcode and label scanning. It can also
 
 | Feature | Description |
 |---|---|
-| New Sale (POS billing) | The main screen. Add items three ways: tap a quick-access button, search by name, ID or code, or type a code such as `ML 2` or `P1025`. Price and stock are filled in automatically. Barcode scanning is also available. |
+| Home (POS billing) | The main screen. Add items three ways: tap a quick-access button, search by name, ID or code, or type a code such as `ML 2` or `P1025`. Price and stock are filled in automatically. Barcode scanning is also available. |
+| One-scanner Add Product | One live camera reads barcodes automatically and the front label on tap. It finds the product in your stock, in open product databases (Open Food/Beauty/Products Facts), or reads name, size and MRP from the label (Claude when a key is saved), then shows the details to check before adding. |
 | Automatic inventory update | Completing payment deducts every item from stock at once and shows a before/after summary. No need to open Inventory after a sale. |
 | Supplier invoice reading | Take a photo or upload a supplier bill. The app reads the supplier, invoice number and items, then shows a review screen. Stock changes only after you confirm. |
 | Stock velocity | For each product: current stock, average daily sales, demand trend, predicted demand, days until it runs out, and a recommended order quantity with a plain-language reason. |
@@ -31,7 +32,7 @@ Open it on a phone to use the camera for barcode and label scanning. It can also
 
 ```mermaid
 flowchart LR
-    A[New Sale: tap / search / code] --> B[Complete payment]
+    A[Home: tap / search / code] --> B[Complete payment]
     B --> C[Stock deducted automatically]
     C --> D{At or below minimum?}
     D -->|yes| E[Low-stock alert]
@@ -54,12 +55,12 @@ How the numbers are worked out:
 
 | Route | Page |
 |---|---|
-| `#/billing` | New Sale (POS billing), the default screen |
+| `#/home` | Home: billing (POS), the default screen |
 | `#/dashboard` | Sales, forecast, insights and alerts |
 | `#/inventory` | Stock list with velocity and recommendations |
 | `#/invoices` | Supplier invoice upload and review |
 | `#/orders` | Purchase orders |
-| `#/add-stock` | Add products by label scan, barcode or by hand |
+| `#/add-stock` | Add Product: one scanner for barcode and label |
 
 ## Tech stack
 

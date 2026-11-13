@@ -166,11 +166,11 @@
 
 @media (max-width: 1024px) {
   .pill-nav a { padding: 10px 14px; font-size: 14px; }
-  .topbar-brand span { display: none; }
+  .topbar-brand .brand-word { display: none; }
 }
 @media (max-width: 768px) {
   .topbar { grid-template-columns: 1fr auto; padding: 14px 16px; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(12px); }
-  .topbar-brand span { display: inline; }
+  .topbar-brand .brand-word { display: inline; }
   .pill-nav { display: none; }
   .main-content { padding: 8px 16px 110px; }
 }

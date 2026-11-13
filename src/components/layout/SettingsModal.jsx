@@ -23,7 +23,7 @@ export default function SettingsModal({ open, onClose }) {
 
   return (
     <Modal open={open} onClose={onClose} title={t('settings.title')}
-      footer={<button className="btn btn-cta" onClick={() => { setSettings({ shopName: shop.trim() || 'Smart Retail' }); onClose(); }}>{t('common.save')}</button>}>
+      footer={<button className="btn btn-cta" onClick={() => { setSettings({ shopName: shop.trim() || 'My Store' }); onClose(); }}>{t('common.save')}</button>}>
       <div className="space-y-7">
         <section>
           <label className="field-label" htmlFor="shop-name">{t('settings.shop')}</label>

@@ -20,17 +20,18 @@ const router = createHashRouter([
   {
     element: <AppShell />,
     children: [
-      { path: "/", element: <Navigate to="/billing" replace /> },
-      { path: "/billing", element: <Billing /> },
+      { path: "/", element: <Navigate to="/home" replace /> },
+      { path: "/home", element: <Billing /> },
+      { path: "/billing", element: <Navigate to="/home" replace /> },
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/inventory", element: <Inventory /> },
       { path: "/add-stock", element: <AddStock /> },
       { path: "/invoices", element: <SupplierInvoice /> },
       { path: "/orders", element: <PurchaseOrders /> },
       // old routes
-      { path: "/sell", element: <Navigate to="/billing" replace /> },
+      { path: "/sell", element: <Navigate to="/home" replace /> },
       { path: "/invoice", element: <Navigate to="/invoices" replace /> },
-      { path: "*", element: <Navigate to="/billing" replace /> },
+      { path: "*", element: <Navigate to="/home" replace /> },
     ],
   },
 ]);
