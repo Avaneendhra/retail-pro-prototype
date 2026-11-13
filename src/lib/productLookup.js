@@ -162,3 +162,39 @@ export function strictMatch(products, name, size) {
   if (s && !hit.item.name.toLowerCase().replace(/\s/g, '').includes(s.replace(/\s/g, ''))) return null;
   return hit.item;
 }
+
+/**
+ * Versions of an image that make 1D barcodes easier to decode:
+ * centre crops (the barcode fills more of the frame) and a high-contrast copy.
+ */
+export function barcodeVariants(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const W = img.width, H = img.height;
+      const make = (frac, binarize = false) => {
+        const cw = Math.round(W * frac), ch = Math.round(H * frac);
+        const c = document.createElement('canvas');
+        c.width = cw; c.height = ch;
+        const x = c.getContext('2d');
+        x.drawImage(img, (W - cw) / 2, (H - ch) / 2, cw, ch, 0, 0, cw, ch);
+        if (binarize) {
+          const d = x.getImageData(0, 0, cw, ch);
+          const p = d.data;
+          let sum = 0;
+          for (let i = 0; i < p.length; i += 4) sum += 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+          const mean = sum / (p.length / 4);
+          for (let i = 0; i < p.length; i += 4) {
+            const v = (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]) < mean ? 0 : 255;
+            p[i] = p[i + 1] = p[i + 2] = v;
+          }
+          x.putImageData(d, 0, 0);
+        }
+        return c.toDataURL('image/png');
+      };
+      resolve([make(0.7), make(1), make(0.5), make(0.7, true)]);
+    };
+    img.onerror = () => resolve([dataUrl]);
+    img.src = dataUrl;
+  });
+}

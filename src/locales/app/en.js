@@ -69,7 +69,7 @@ export default {
     why4: 'Ordering {{order}} covers about {{cover}} days of sales and keeps you above the minimum of {{min}}.',
     last14: 'Units sold, last 14 days', poCreated: 'Purchase order {{no}} created',
     fields: { name: 'Name (English)', nameLocal: 'Name in {{lang}}', price: 'Selling price (₹)', min: 'Minimum stock', quantity: 'Current stock', code: 'Short code' },
-    saved: 'Product saved', none: 'No products match.',
+    saved: 'Product saved', none: 'No products match.', needsReview: 'Check details',
   },
 
   orders: {
@@ -109,6 +109,12 @@ export default {
   },
 
   addStock: {
+    subtitleAuto: 'Show a product to the camera. It is recognised and added to stock automatically, with or without a barcode.',
+    autoAdd: 'Auto-add', autoOn: 'Adds each product as soon as it is recognised', autoOff: 'Shows details to check before adding',
+    tipAuto: 'Start the camera and hold each product in front of it for a second. Barcodes and labels are read automatically. Move the product away and back to add another one.',
+    lookingAuto: 'Auto-adding · show a product', hold: 'Hold each product in view for a second',
+    inStock: '{{qty}} in stock', needsDetails: 'check details', undo: 'Undo', undone: 'Removed {{name}}',
+    placeholderName: 'Item {{code}}', setDetails: 'Set details', emptyAuto: 'Products you show to the camera will appear here as they are added.',
     title: 'Add Product', subtitle: 'Point the camera at the product. One scanner reads the barcode and the label together, then shows the details to check.',
     startCamera: 'Start camera', stop: 'Stop', scan: 'Scan product', upload: 'Upload photo', manual: 'Enter manually',
     looking: 'Looking for a barcode…', stageBarcode: 'Reading the barcode…', stageLookup: 'Finding product details…', stageLabel: 'Reading the label…',

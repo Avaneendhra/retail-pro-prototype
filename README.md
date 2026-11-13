@@ -19,7 +19,7 @@ Open it on a phone to use the camera for barcode and label scanning. It can also
 | Feature | Description |
 |---|---|
 | Home (POS billing) | The main screen. Add items three ways: tap a quick-access button, search by name, ID or code, or type a code such as `ML 2` or `P1025`. Price and stock are filled in automatically. Barcode scanning is also available. |
-| One-scanner Add Product | One live camera reads barcodes automatically and the front label on tap. It finds the product in your stock, in open product databases (Open Food/Beauty/Products Facts), or reads name, size and MRP from the label (Claude when a key is saved), then shows the details to check before adding. |
+| Automatic Add Product | Start the camera and show products one by one. Each product is recognised and added to stock automatically: by barcode (your stock, then Open Food/Beauty/Products Facts) or, when there is no barcode, from the label (name, brand, size, MRP; Claude when a key is saved). Holding a product still adds it once; take it away and show it again to add another. Undo and +1 are one tap away, and items missing a price are flagged to complete. Turn Auto-add off to check details before adding. |
 | Automatic inventory update | Completing payment deducts every item from stock at once and shows a before/after summary. No need to open Inventory after a sale. |
 | Supplier invoice reading | Take a photo or upload a supplier bill. The app reads the supplier, invoice number and items, then shows a review screen. Stock changes only after you confirm. |
 | Stock velocity | For each product: current stock, average daily sales, demand trend, predicted demand, days until it runs out, and a recommended order quantity with a plain-language reason. |
@@ -60,7 +60,7 @@ How the numbers are worked out:
 | `#/inventory` | Stock list with velocity and recommendations |
 | `#/invoices` | Supplier invoice upload and review |
 | `#/orders` | Purchase orders |
-| `#/add-stock` | Add Product: one scanner for barcode and label |
+| `#/add-stock` | Add Product: automatic camera scanning, barcode or label |
 
 ## Tech stack
 

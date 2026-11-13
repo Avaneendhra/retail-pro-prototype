@@ -77,7 +77,7 @@ function EditModal({ product, onClose }) {
   const save = () => {
     updateProduct(product.id, {
       name: f.name.trim() || product.name, code: f.code.trim().toUpperCase() || product.code, category: f.category,
-      price: Number(f.price) || 0, min: Number(f.min) || 0, quantity: Math.max(0, Number(f.quantity) || 0),
+      price: Number(f.price) || 0, min: Number(f.min) || 0, quantity: Math.max(0, Number(f.quantity) || 0), needsReview: false,
       ...(lang !== 'en' ? { names: { ...product.names, [lang]: f.local.trim() } } : {}),
     });
     showToast(t('inventory.saved'), 'success');
@@ -210,7 +210,7 @@ export default function Inventory() {
                   <React.Fragment key={p.id}>
                     <tr id={`row-${p.id}`} className="cursor-pointer" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
                       <td>
-                        <p className="font-medium">{pname(p)}</p>
+                        <p className="font-medium flex items-center gap-2">{pname(p)}{p.needsReview && <span className="badge badge-warning">{t('inventory.needsReview')}</span>}</p>
                         <p className="text-xs font-mono text-[var(--text-muted)] mt-0.5">{p.code} · {p.id} · {t(`cat.${p.category}`)}</p>
                       </td>
                       <td>

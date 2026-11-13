@@ -131,6 +131,7 @@ export const InventoryProvider = ({ children }) => {
           id, code: (np.code || np.name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(),
           barcode: np.barcode || id, name: np.name, names: np.names || {}, category: CATEGORIES.includes(np.category) ? np.category : 'other',
           price: Number(np.price) || 0, quantity: qty, min: Number(np.min) || 5, coverDays: 7, addedAt: Date.now(),
+          ...(np.needsReview ? { needsReview: true } : {}),
         };
         created.push(product);
         changes.push({ productId: id, name: product.name, names: product.names, before: 0, after: qty, qty, isNew: true });
@@ -192,6 +193,15 @@ export const InventoryProvider = ({ children }) => {
   const purchaseOrdersRef = useRef(purchaseOrders);
   purchaseOrdersRef.current = purchaseOrders;
 
+  /** Reverse a receiveStock() result (used by Undo after an automatic add). */
+  const revertStock = useCallback((changes) => {
+    const removeIds = new Set(changes.filter(c => c.isNew).map(c => c.productId));
+    const minus = Object.fromEntries(changes.filter(c => !c.isNew).map(c => [c.productId, c.qty]));
+    setProducts(prev => prev
+      .filter(p => !removeIds.has(p.id))
+      .map(p => minus[p.id] ? { ...p, quantity: Math.max(0, p.quantity - minus[p.id]) } : p));
+  }, []);
+
   const resetDemo = useCallback(() => {
     setProducts(seedProducts());
     setSales(generateSalesHistory(SEED_PRODUCTS));
@@ -204,7 +214,7 @@ export const InventoryProvider = ({ children }) => {
 
   const value = {
     products, sales, bills, purchaseOrders, stats, lowStockProducts, totalInventoryValue, nextBillNo: meta.nextBill,
-    byId, findByBarcode, findByCode, checkout, receiveStock, addProduct, updateProduct,
+    byId, findByBarcode, findByCode, checkout, receiveStock, revertStock, addProduct, updateProduct,
     createPO, updatePO, deletePO, receivePO, resetDemo,
   };
 
