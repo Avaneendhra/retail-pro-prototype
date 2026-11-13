@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import Fuse from 'fuse.js';
 import { useInventory } from '../../context/InventoryContext';
@@ -7,6 +8,7 @@ import { useOnline, useSettings } from '../../lib/settings';
 import { inr, pname, fmtDate, fmtTime } from '../../lib/format';
 import Modal from '../common/Modal';
 import BarcodeScanModal from './BarcodeScanModal';
+import InstallBanner from '../layout/InstallBanner';
 
 const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 
@@ -140,6 +142,7 @@ export default function Billing() {
 
   return (
     <div className="billing">
+      <InstallBanner />
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6 mt-2">
         <div>
@@ -256,7 +259,7 @@ export default function Billing() {
         </div>
 
         {/* ── Right: current bill ── */}
-        <aside className="card bill-panel xl:sticky xl:top-[104px]">
+        <aside id="bill-panel" className="card bill-panel xl:sticky xl:top-[104px] scroll-mt-24">
           <div className="flex items-center justify-between px-6 pt-6 pb-4">
             <div>
               <h2 className="font-display text-[20px] font-bold tracking-tight">{t('billing.cartTitle')}</h2>
@@ -327,6 +330,20 @@ export default function Billing() {
           </div>
         </aside>
       </div>
+
+      {/* Phone: sticky bar with the running total, jumps to the bill */}
+      {lines.length > 0 && !result && createPortal(
+        <div className="mobile-pay-bar xl:hidden">
+          <div className="min-w-0">
+            <p className="text-xs text-[var(--text-muted)]">{t('billing.items', { count: itemCount })}</p>
+            <p className="font-display font-bold text-[22px] leading-tight">{inr(total)}</p>
+          </div>
+          <button className="btn btn-cta" onClick={() => document.getElementById('bill-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            {t('billing.reviewPay')} →
+          </button>
+        </div>,
+        document.body,
+      )}
 
       {/* Payment complete */}
       <Modal open={!!result} onClose={nextSale} title={t('billing.paid')} width={560}

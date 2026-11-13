@@ -140,3 +140,63 @@ html[lang="te"] .page-title, html[lang="hi"] .page-title, html[lang="mr"] .page-
 /* Auto-add confirmation over the camera */
 .auto-flash { padding: 12px 14px; border-radius: 18px; background: rgba(13, 13, 13, 0.82); backdrop-filter: blur(10px); color: #fff; border: 1px solid rgba(255,255,255,0.12); animation: flash-in 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes flash-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* Scanner viewfinder */
+.scan-window { position: absolute; left: 10%; right: 10%; top: 25%; bottom: 25%; border-radius: 22px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none; }
+.scan-window::before { content: ''; position: absolute; inset: 0; border-radius: 22px; border: 2px solid rgba(255, 255, 255, 0.85); }
+.scan-window span { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: var(--accent-blue); box-shadow: 0 0 12px var(--accent-blue); animation: scan-line 1.8s ease-in-out infinite; }
+@keyframes scan-line { 0%, 100% { transform: translateY(-40px); opacity: 0.4; } 50% { transform: translateY(40px); opacity: 1; } }
+
+/* ===================================================================
+   Mobile app polish
+   =================================================================== */
+.install-banner {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin: 4px 0 18px;
+  border-radius: 22px; background: var(--surface); border: 1px solid var(--border-strong);
+}
+
+/* Sticky total + pay bar above the bottom nav (phones / tablets) */
+.mobile-pay-bar {
+  position: fixed; left: 12px; right: 12px; z-index: 105;
+  bottom: calc(4.25rem + 34px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 10px 10px 18px; border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-strong); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  animation: flash-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (min-width: 769px) { .mobile-pay-bar { bottom: 24px; } }
+
+@media (max-width: 768px) {
+  /* notch / status bar when installed full-screen */
+  .topbar { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  .main-content { padding-bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
+  .page-header { margin: 8px 0 20px; }
+  .page-title { font-size: clamp(32px, 10vw, 44px); }
+
+  /* modals become bottom sheets */
+  .modal-backdrop { align-items: flex-end; padding: 0; }
+  .modal-panel { border-radius: 26px 26px 0 0; max-height: 92vh; padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+
+  /* comfortable tap targets */
+  .btn { min-height: 46px; }
+  .btn-sm { min-height: 40px; }
+  .form-input { font-size: 16px; } /* stops iOS zooming into inputs */
+  .quick-btn { min-height: 96px; padding: 14px; border-radius: 20px; }
+  .quick-price { font-size: 18px; }
+
+  /* tables: hide secondary columns; details live in the expanded row */
+  .table { min-width: 0; }
+  .table .col-optional { display: none; }
+  .table td, .table th { padding: 12px 14px; }
+  .table th { white-space: normal; }
+
+  /* dashboard type scales down */
+  .display-xl { font-size: clamp(44px, 13vw, 64px); }
+  .metric[class*="text-[6"], .metric[class*="text-[7"], .metric[class*="text-[8"] { font-size: 48px !important; }
+}
+
+/* Installed app: no browser chrome, so avoid text selection on taps */
+@media (display-mode: standalone) {
+  .btn, .quick-btn, .pill-nav a, .mobile-bottom-nav-item { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+}

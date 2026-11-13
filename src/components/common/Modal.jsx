@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function Modal({ open, onClose, title, children, footer, width = 520 }) {
   useEffect(() => {
@@ -9,7 +10,7 @@ export default function Modal({ open, onClose, title, children, footer, width = 
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
       <div className="modal-panel animate-in" style={{ maxWidth: width }} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-start justify-between gap-4 mb-5">
@@ -21,6 +22,7 @@ export default function Modal({ open, onClose, title, children, footer, width = 
         <div>{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-3 mt-6">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

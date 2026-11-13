@@ -14,6 +14,15 @@ No sign-up or backend. The app ships with sample products and a week of sales, a
 
 Open it on a phone to use the camera for barcode and label scanning. It can also be installed to the home screen.
 
+## Install on your phone
+
+stokd is an installable app (PWA). Open the live link on your phone:
+
+- **Android (Chrome):** tap **Install app** on the banner, or menu → *Install app*.
+- **iPhone (Safari):** tap **Share** → **Add to Home Screen**.
+
+It then opens full-screen from the home screen, works offline (including barcode scanning), and has shortcuts for New sale, Add product and Inventory.
+
 ## Features
 
 | Feature | Description |
@@ -67,8 +76,8 @@ How the numbers are worked out:
 - **React 18** with **React Router** (hash routing, so it works on GitHub Pages)
 - **Vite 4** for dev server and builds
 - **Tailwind CSS 3** plus a CSS-variable design system (`src/index.css`)
-- **html5-qrcode** for barcode scanning
-- **Tesseract.js** for on-device text recognition of labels and invoices
+- **ZXing C++ (zxing-wasm)** for barcode scanning, with the browser's native BarcodeDetector when available; frames are cropped, zoomed and sharpened for blurry or far-away codes
+- **Tesseract.js** for on-device text recognition of labels and invoices (product names are taken from the largest text on the pack)
 - **Claude** (optional, with your own Anthropic API key in Settings) for more accurate invoice reading
 - **i18next** for English, Telugu, Hindi and Marathi
 - **vite-plugin-pwa** for offline support and installability

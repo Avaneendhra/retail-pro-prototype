@@ -160,14 +160,14 @@ export default function Inventory() {
           <p className="page-subtitle">{t('inventory.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-stretch gap-3">
-          <div className="card card-accent-blue px-6 py-4 flex items-center gap-6">
-            <div><p className="eyebrow text-[10px]">{t('inventory.totalProducts')}</p><p className="metric text-[26px] mt-1">{products.length}</p></div>
+          <div className="card card-accent-blue px-5 sm:px-6 py-4 flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-start">
+            <div><p className="eyebrow text-[10px]">{t('inventory.totalProducts')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{products.length}</p></div>
             <div className="w-px self-stretch bg-black/10" />
-            <div><p className="eyebrow text-[10px]">{t('inventory.stockValue')}</p><p className="metric text-[26px] mt-1">{inr(totalInventoryValue)}</p></div>
+            <div><p className="eyebrow text-[10px]">{t('inventory.stockValue')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{inr(totalInventoryValue)}</p></div>
             <div className="w-px self-stretch bg-black/10" />
-            <div><p className="eyebrow text-[10px]">{t('inventory.needAttention')}</p><p className="metric text-[26px] mt-1">{attention}</p></div>
+            <div><p className="eyebrow text-[10px]">{t('inventory.needAttention')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{attention}</p></div>
           </div>
-          <Link to="/add-stock" className="btn btn-ghost self-center">+ {t('inventory.addStock')}</Link>
+          <Link to="/add-stock" className="btn btn-ghost self-center w-full sm:w-auto">+ {t('inventory.addStock')}</Link>
         </div>
       </div>
 
@@ -194,10 +194,10 @@ export default function Inventory() {
               <tr>
                 <th>{t('common.product')}</th>
                 <th>{t('common.stock')}</th>
-                <th>{t('inventory.avgDaily')}</th>
-                <th>{t('inventory.trendLabel')}</th>
-                <th>{t('inventory.predicted')}</th>
-                <th>{t('inventory.daysLeft')}</th>
+                <th className="col-optional">{t('inventory.avgDaily')}</th>
+                <th className="col-optional">{t('inventory.trendLabel')}</th>
+                <th className="col-optional">{t('inventory.predicted')}</th>
+                <th className="col-optional">{t('inventory.daysLeft')}</th>
                 <th>{t('inventory.recommendedOrder')}</th>
               </tr>
             </thead>
@@ -220,10 +220,10 @@ export default function Inventory() {
                           {s.status !== 'ok' && <StatusBadge status={s.status} />}
                         </div>
                       </td>
-                      <td className="font-mono">{s.avg7.toFixed(1)}</td>
-                      <td><TrendMark trend={s.trend} /></td>
-                      <td>{t(`demand.${s.demand}`)}</td>
-                      <td className={`font-mono ${s.daysLeft <= 2 ? 'text-[var(--danger)]' : s.daysLeft <= (p.coverDays || 7) ? 'text-[var(--warning)]' : ''}`}>
+                      <td className="font-mono col-optional">{s.avg7.toFixed(1)}</td>
+                      <td className="col-optional"><TrendMark trend={s.trend} /></td>
+                      <td className="col-optional">{t(`demand.${s.demand}`)}</td>
+                      <td className={`col-optional font-mono ${s.daysLeft <= 2 ? 'text-[var(--danger)]' : s.daysLeft <= (p.coverDays || 7) ? 'text-[var(--warning)]' : ''}`}>
                         {fmtDays(s.daysLeft)} {Number.isFinite(s.daysLeft) && <span className="text-[var(--text-muted)] text-xs">{t('common.days')}</span>}
                       </td>
                       <td className="font-mono font-semibold">{s.recommendedQty > 0 ? `+${s.recommendedQty}` : <span className="text-[var(--text-muted)] font-normal">—</span>}</td>

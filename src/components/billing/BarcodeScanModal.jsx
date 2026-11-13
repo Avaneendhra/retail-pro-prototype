@@ -1,52 +1,54 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Html5Qrcode } from 'html5-qrcode';
 import Modal from '../common/Modal';
+import { openCamera, closeCamera, scanVideoFrame, warmUpBarcodeEngine } from '../../lib/scanEngine';
 
-/** Continuous barcode scanner. Calls onCode once per distinct scan (1.5s debounce). */
+/** Continuous barcode scanner for billing. Calls onCode once per distinct scan (1.5s debounce). */
 export default function BarcodeScanModal({ open, onClose, onCode }) {
   const { t } = useTranslation();
   const [error, setError] = useState('');
-  const scannerRef = useRef(null);
+  const videoRef = useRef(null);
   const lastRef = useRef({ code: '', at: 0 });
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
+    let stopped = false, cam = null, attempt = 0;
     setError('');
-    const start = async () => {
-      try {
-        const scanner = new Html5Qrcode('bill-scan-reader');
-        scannerRef.current = scanner;
-        await scanner.start({ facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 260, height: 160 }, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
-          (text) => {
-            const now = Date.now();
-            if (text === lastRef.current.code && now - lastRef.current.at < 1500) return;
-            lastRef.current = { code: text, at: now };
-            onCodeRef.current?.(text);
-          }, () => {});
-        if (cancelled) scanner.stop().catch(() => {});
-      } catch {
-        if (!cancelled) setError(t('addStock.errCamera'));
+    warmUpBarcodeEngine();
+    const loop = async () => {
+      if (stopped) return;
+      const hit = await scanVideoFrame(videoRef.current, attempt++).catch(() => null);
+      if (hit && !stopped) {
+        const now = Date.now();
+        if (hit.text !== lastRef.current.code || now - lastRef.current.at > 1500) {
+          lastRef.current = { code: hit.text, at: now };
+          if (navigator.vibrate) navigator.vibrate(50);
+          onCodeRef.current?.(hit.text);
+        }
       }
+      if (!stopped) setTimeout(loop, 90);
     };
-    const id = setTimeout(start, 50); // wait for the reader element
-    return () => {
-      cancelled = true;
-      clearTimeout(id);
-      const s = scannerRef.current;
-      scannerRef.current = null;
-      if (s) s.stop().catch(() => {});
-    };
+    const id = setTimeout(async () => {
+      try {
+        cam = await openCamera(videoRef.current);
+        if (stopped) { closeCamera(cam.stream); return; }
+        loop();
+      } catch {
+        if (!stopped) setError(t('addStock.errCamera'));
+      }
+    }, 50);
+    return () => { stopped = true; clearTimeout(id); closeCamera(cam?.stream); };
   }, [open, t]);
 
   return (
     <Modal open={open} onClose={onClose} title={t('billing.scan')} width={480}
       footer={<button className="btn btn-secondary" onClick={onClose}>{t('common.close')}</button>}>
-      <div id="bill-scan-reader" className="rounded-2xl overflow-hidden bg-black min-h-[240px]" />
+      <div className="relative rounded-2xl overflow-hidden bg-black aspect-[4/3]">
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
+        {!error && <div className="scan-window" aria-hidden="true"><span /></div>}
+      </div>
       {error && <p className="text-sm text-[var(--danger)] mt-3">{error}</p>}
     </Modal>
   );

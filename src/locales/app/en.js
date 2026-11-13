@@ -17,7 +17,7 @@ export default {
     lowAlert: '{{name}}: {{qty}} left (min {{min}})', openInventory: 'Open inventory' },
 
   billing: {
-    title: 'Home', billNo: 'New sale · Bill #{{no}}',
+    title: 'Home', billNo: 'New sale · Bill #{{no}}', reviewPay: 'Review & pay',
     quick: 'Quick add', quickHint: 'Tap a product to add it',
     search: 'Search', searchPlaceholder: 'Product name, ID or code', noResults: 'No matching products',
     codeEntry: 'Code entry', codePlaceholder: 'ML 2  or  P1025', codeHint: 'Type a code or product ID, optional quantity, then Enter',
@@ -109,6 +109,7 @@ export default {
   },
 
   addStock: {
+    torch: 'Flash',
     subtitleAuto: 'Show a product to the camera. It is recognised and added to stock automatically, with or without a barcode.',
     autoAdd: 'Auto-add', autoOn: 'Adds each product as soon as it is recognised', autoOff: 'Shows details to check before adding',
     tipAuto: 'Start the camera and hold each product in front of it for a second. Barcodes and labels are read automatically. Move the product away and back to add another one.',
@@ -131,6 +132,11 @@ export default {
     errCamera: 'Camera access denied. Please allow camera permission.', errRead: 'Could not read this product. Try better light or enter details by hand.', errName: 'Name is required', errPrice: 'Enter a selling price',
   },
 
+  install: {
+    title: 'Get the stokd app', body: 'Install it on this phone: opens full-screen, works offline, one tap from your home screen.',
+    ios: 'On iPhone: tap the Share button, then "Add to Home Screen".', button: 'Install app',
+    settingsTitle: 'Phone app', installed: 'Installed on this device.', manual: 'Open this site in Chrome or Safari on your phone and choose "Install app" or "Add to Home Screen".',
+  },
   settings: {
     title: 'Settings', aiTitle: 'AI invoice reading',
     aiBody: 'Without a key, invoices are read on this device. Add an Anthropic API key to read invoices with Claude, which is more accurate on real bills. The key is stored only in this browser.',

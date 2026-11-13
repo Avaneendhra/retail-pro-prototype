@@ -198,3 +198,27 @@ export function barcodeVariants(dataUrl) {
     img.src = dataUrl;
   });
 }
+
+/**
+ * Label parsing that also uses text size from OCR: the product name and brand
+ * are almost always the largest text on the pack.
+ */
+export function parseLabel({ text, lines = [] }) {
+  const base = parseLabelText(text);
+  const usable = lines
+    .map(l => ({ ...l, clean: l.text.replace(/[^\p{L}\p{N}\s.&'%/+-]/gu, ' ').replace(/\s+/g, ' ').trim() }))
+    .filter(l => l.clean.length >= 3 && /\p{L}{3,}/u.test(l.clean) && !NOISE.test(l.clean) && !/^\d/.test(l.clean));
+  if (!usable.length) return base;
+  const tallest = Math.max(...usable.map(l => l.height));
+  // lines at least 60% as tall as the biggest text, top to bottom
+  const big = usable.filter(l => l.height >= tallest * 0.5).sort((a, b) => a.y - b.y).slice(0, 3);
+  if (!big.length) return base;
+  const brandLine = big.length > 1 && big[0].clean.split(' ').length <= 2 ? big[0].clean : '';
+  const nameParts = (brandLine ? big.slice(1) : big).map(l => l.clean);
+  let nameText = nameParts.join(' ').replace(/\s+/g, ' ').trim();
+  if (nameText === nameText.toUpperCase()) nameText = nameText.toLowerCase();
+  const brand = brandLine ? titleCase(brandLine.toLowerCase()) : base.brand;
+  if (!nameText) return { ...base, brand };
+  const name = composeName(brand, nameText, base.size);
+  return { ...base, brand, name: name || base.name };
+}

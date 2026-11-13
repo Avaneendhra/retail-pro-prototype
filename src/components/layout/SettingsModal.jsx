@@ -4,12 +4,14 @@ import Modal from '../common/Modal';
 import { useSettings } from '../../lib/settings';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
+import { useInstall } from '../../lib/install';
 
 export default function SettingsModal({ open, onClose }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useSettings();
   const { resetDemo } = useInventory();
   const { showToast } = useToast();
+  const { installed, canPrompt, iosHint, install } = useInstall();
   const [key, setKey] = useState('');
   const [shop, setShop] = useState(settings.shopName);
   const hasKey = !!settings.apiKey;
@@ -48,6 +50,13 @@ export default function SettingsModal({ open, onClose }) {
               <button className="btn btn-primary" onClick={saveKey} disabled={!key.trim()}>{t('common.save')}</button>
             </div>
           )}
+        </section>
+
+        <section>
+          <h3 className="font-semibold mb-2">{t('install.settingsTitle')}</h3>
+          {installed ? <p className="text-sm text-[var(--success)]">{t('install.installed')}</p>
+            : canPrompt ? <button className="btn btn-primary btn-sm" onClick={install}>{t('install.button')}</button>
+            : <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{iosHint ? t('install.ios') : t('install.manual')}</p>}
         </section>
 
         <section>

@@ -1,20 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Html5Qrcode, Html5QrcodeSupportedFormats as F } from 'html5-qrcode';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
 import { useSettings } from '../../lib/settings';
 import { inr, pname } from '../../lib/format';
 import { CATEGORIES } from '../../data/seed';
 import { downscale } from '../../lib/invoiceParser';
-import {
-  isPlausibleBarcode, lookupBarcode, parseLabelText, guessCategory, frameFromVideo, dataUrlToFile, composeName, strictMatch, barcodeVariants,
-} from '../../lib/productLookup';
+import { lookupBarcode, parseLabel, guessCategory, frameFromVideo, composeName, strictMatch } from '../../lib/productLookup';
+import { openCamera, closeCamera, setTorch, scanVideoFrame, scanImage, loadImage, ocrLabel, warmUpBarcodeEngine } from '../../lib/scanEngine';
 
-const FORMATS = [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.QR_CODE];
-const READER_ID = 'unified-reader';
-const HELPER_ID = 'unified-scan-helper';
 const LABEL_EVERY_MS = 1800;   // how often the camera frame is checked for a label
 const SAME_ITEM_GAP_MS = 4000; // the same product must leave the frame this long before it counts again
 const AUTO_KEY = 'sr2_auto_add';
@@ -44,7 +39,10 @@ export default function AddStock() {
   const [flash, setFlash] = useState(null);        // last automatic add
   const [recent, setRecent] = useState([]);
 
-  const scannerRef = useRef(null);
+  const videoRef = useRef(null);
+  const camRef = useRef(null);                     // { stream, track, hasTorch }
+  const [torch, setTorchOn] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false);
   const workerRef = useRef(null);
   const confirmRef = useRef({ code: '', count: 0 });
   const busyRef = useRef(false);
@@ -64,21 +62,22 @@ export default function AddStock() {
       const { createWorker } = await import('tesseract.js');
       workerRef.current = await createWorker('eng');
     }
-    const { data } = await workerRef.current.recognize(dataUrl);
-    return data.text;
+    return ocrLabel(workerRef.current, await loadImage(dataUrl));
   }, []);
 
-  useEffect(() => () => {
-    workerRef.current?.terminate?.();
-    const s = scannerRef.current;
-    scannerRef.current = null;
-    if (s) s.stop().then(() => s.clear()).catch(() => {});
+  useEffect(() => {
+    warmUpBarcodeEngine();
+    return () => {
+      workerRef.current?.terminate?.();
+      closeCamera(camRef.current?.stream);
+      camRef.current = null;
+    };
   }, []);
 
   /* ── Label reading: on-device OCR first; Claude for accurate details when a key is saved ── */
   const readLabel = useCallback(async (dataUrl, { quiet = false } = {}) => {
     let parsed = null;
-    try { parsed = parseLabelText(await ocr(dataUrl)); } catch { parsed = null; }
+    try { parsed = parseLabel(await ocr(dataUrl)); } catch { parsed = null; }
     // In the automatic loop, only spend a Claude call when there is visible label text
     if (useClaude && (!quiet || (parsed && /\p{L}{4,}/u.test(parsed.name || '')))) {
       try {
@@ -93,17 +92,7 @@ export default function AddStock() {
   }, [useClaude, settings.apiKey, ocr, showToast, t]);
 
   const decodeImage = useCallback(async (dataUrl) => {
-    // Try centre crops and a high-contrast copy: makes blurry camera frames decode reliably
-    for (const variant of await barcodeVariants(dataUrl)) {
-      try {
-        const helper = new Html5Qrcode(HELPER_ID, { formatsToSupport: FORMATS, verbose: false });
-        const res = await helper.scanFileV2(dataUrlToFile(variant), false);
-        try { helper.clear(); } catch { /* ignore */ }
-        const fmt = res?.result?.format?.formatName || '';
-        if (isPlausibleBarcode(res.decodedText, fmt)) return res.decodedText;
-      } catch { /* not found in this variant */ }
-    }
-    return '';
+    try { return (await scanImage(await loadImage(dataUrl)))?.text || ''; } catch { return ''; }
   }, []);
 
   /**
@@ -206,8 +195,7 @@ export default function AddStock() {
           if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
         }
       } else {
-        try { scannerRef.current?.pause(true); } catch { /* ignore */ }
-        setResult({ ...draft, qty: 1, min: 5, code: '' });
+            setResult({ ...draft, qty: 1, min: 5, code: '' });
       }
     } finally {
       setStage(null);
@@ -217,10 +205,8 @@ export default function AddStock() {
 
   const handleRef = useRef(handle); handleRef.current = handle;
 
-  /* ── Live barcode detection ── */
-  const onDecode = useCallback((text, res) => {
-    const fmt = res?.result?.format?.formatName || '';
-    if (!isPlausibleBarcode(text, fmt)) return;
+  /* ── Live barcode detection on our own video, several times a second ── */
+  const onBarcode = useCallback((text) => {
     lastBarcodeAtRef.current = Date.now();
     const c = confirmRef.current;
     c.count = c.code === text ? c.count + 1 : 1;
@@ -234,10 +220,26 @@ export default function AddStock() {
     }
     if (c.count < 2 || busyRef.current) return;
     confirmRef.current = { code: '', count: 0 };
-    const frame = frameFromVideo(document.querySelector(`#${READER_ID} video`), 1400);
+    const frame = frameFromVideo(videoRef.current, 1400);
     handleRef.current({ barcode: text, dataUrl: frame, quiet: true });
   }, [findByBarcode]);
-  const onDecodeRef = useRef(onDecode); onDecodeRef.current = onDecode;
+  const onBarcodeRef = useRef(onBarcode); onBarcodeRef.current = onBarcode;
+
+  useEffect(() => {
+    if (!live) return;
+    let stopped = false, attempt = 0;
+    const loop = async () => {
+      if (stopped) return;
+      const v = videoRef.current;
+      if (v && !resultRef.current) {
+        const hit = await scanVideoFrame(v, attempt++).catch(() => null);
+        if (hit && !stopped) onBarcodeRef.current(hit.text);
+      }
+      if (!stopped) setTimeout(loop, 90);
+    };
+    loop();
+    return () => { stopped = true; };
+  }, [live]);
 
   /* ── Automatic label reading for products without a (visible) barcode ── */
   useEffect(() => {
@@ -245,7 +247,7 @@ export default function AddStock() {
     const id = setInterval(() => {
       if (busyRef.current || resultRef.current) return;
       if (Date.now() - lastBarcodeAtRef.current < 2500) return; // a barcode is in view, let that path handle it
-      const frame = frameFromVideo(document.querySelector(`#${READER_ID} video`), 1100);
+      const frame = frameFromVideo(videoRef.current, 1400);
       if (frame) handleRef.current({ dataUrl: frame, quiet: true });
     }, LABEL_EVERY_MS);
     return () => clearInterval(id);
@@ -253,33 +255,28 @@ export default function AddStock() {
 
   const start = async () => {
     try {
-      const scanner = new Html5Qrcode(READER_ID, { formatsToSupport: FORMATS, verbose: false });
-      scannerRef.current = scanner;
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 12, aspectRatio: 4 / 3,
-          qrbox: (w, h) => ({ width: Math.floor(w * 0.86), height: Math.floor(h * 0.5) }),
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-        },
-        (text, res) => onDecodeRef.current(text, res),
-        () => {},
-      );
+      const cam = await openCamera(videoRef.current);
+      camRef.current = cam;
+      setHasTorch(cam.hasTorch);
       setLive(true);
     } catch {
-      scannerRef.current = null;
       showToast(t('addStock.errCamera'), 'error');
     }
   };
 
-  const stop = async () => {
-    const s = scannerRef.current;
-    scannerRef.current = null;
+  const stop = () => {
+    closeCamera(camRef.current?.stream);
+    camRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setLive(false);
-    if (s) { try { await s.stop(); s.clear(); } catch { /* already stopped */ } }
+    setTorchOn(false);
   };
 
-  const resume = () => { try { scannerRef.current?.resume(); } catch { /* not paused */ } };
+  const toggleTorch = async () => {
+    if (camRef.current?.track && await setTorch(camRef.current.track, !torch)) setTorchOn(!torch);
+  };
+
+  const resume = () => {};
 
   const onUpload = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -318,7 +315,6 @@ export default function AddStock() {
   };
   const set = (patch) => setResult(r => ({ ...r, ...patch }));
   const manual = () => {
-    try { scannerRef.current?.pause(true); } catch { /* ignore */ }
     setResult({ name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [] });
   };
   const reviewProduct = result?.productId ? byId(result.productId) : null;
@@ -344,7 +340,8 @@ export default function AddStock() {
         {/* ── Camera ── */}
         <div className="card p-0 overflow-hidden">
           <div className="relative bg-black aspect-[3/4] sm:aspect-[4/3] scanner-stage">
-            <div id={READER_ID} className="absolute inset-0" />
+            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
+            {live && <div className="scan-window" aria-hidden="true"><span /></div>}
 
             {!live && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 p-8 text-center">
@@ -392,6 +389,11 @@ export default function AddStock() {
               <div className="absolute bottom-0 inset-x-0 p-4 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent">
                 <button className="btn btn-sm !text-white !border-white/30 border" onClick={stop}>{t('addStock.stop')}</button>
                 <span className="flex-1 text-center text-xs text-white/60">{t('addStock.hold')}</span>
+                {hasTorch && (
+                  <button className={`icon-pill !border-white/20 ${torch ? '!bg-[var(--accent-blue)] !text-black' : '!bg-black/40 !text-white'}`} onClick={toggleTorch} aria-label={t('addStock.torch')} title={t('addStock.torch')}>
+                    <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 2h6l-1 6h3l-7 14 1-9H8l1-11z" /></svg>
+                  </button>
+                )}
                 <button className="icon-pill !bg-black/40 !border-white/20 !text-white" onClick={() => fileRef.current?.click()} aria-label={t('addStock.upload')} title={t('addStock.upload')}>
                   <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </button>
@@ -403,7 +405,6 @@ export default function AddStock() {
             <button className="text-sm font-semibold text-[var(--primary)]" onClick={manual}>{t('addStock.manual')}</button>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
-          <div id={HELPER_ID} className="hidden" />
         </div>
 
         {/* ── Right column ── */}
