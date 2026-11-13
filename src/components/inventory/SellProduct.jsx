@@ -31,23 +31,6 @@ export default function SellProduct() {
   const [recentSales, setRecentSales] = useState([]);
   const [sessionTotal, setSessionTotal] = useState(0);
 
-  const [manualSearch, setManualSearch] = useState('');
-  const [manualQty, setManualQty] = useState({});
-  const manualResults = products.filter(p => {
-    const q = manualSearch.trim().toLowerCase();
-    return !q || p.name.toLowerCase().includes(q) || String(p.barcode).includes(q);
-  });
-
-  const manualSell = (p) => {
-    const qty = manualQty[p.id] ?? 1;
-    const res = sellProduct(p.id, qty);
-    if (!res.success) { showToast(res.error, 'error'); return; }
-    setSessionTotal(prev => prev + p.price * qty);
-    setRecentSales(prev => [{ name: p.name, price: p.price * qty, qty, time: Date.now() }, ...prev.slice(0, 19)]);
-    setManualQty(prev => ({ ...prev, [p.id]: 1 }));
-    showToast(`✅ Sold ${qty}× "${p.name}" — ₹${p.price * qty}`, 'success');
-  };
-
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -206,11 +189,11 @@ export default function SellProduct() {
       </div>
 
       {/* Session Total */}
-      <div className="card card-accent-blue p-7 mb-6">
+      <div className="card p-4 mb-6 bg-gradient-to-r from-[var(--surface)] to-[var(--bg)] border-2 border-[var(--success)]/30">
         <div className="flex items-center justify-between">
           <div>
-            <p className="eyebrow">Session Total</p>
-            <p className="metric text-[48px] mt-2">₹{sessionTotal.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-[var(--text-muted)] font-semibold uppercase">Session Total</p>
+            <p className="text-3xl font-bold text-[var(--success)]">₹{sessionTotal.toLocaleString('en-IN')}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-[var(--text-muted)]">{recentSales.length} items sold</p>
@@ -223,56 +206,20 @@ export default function SellProduct() {
 
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-6">
-        <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'btn-primary shadow-glow border-0' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+        <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-glow border-0' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
           ✨ AI Scan & Sell
         </button>
         <button onClick={() => { stopEverything(); setMode('barcode'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'barcode' ? 'btn-primary shadow-glow' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
           📊 Barcode Scan
         </button>
-        <button onClick={() => { stopEverything(); setMode('manual'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'manual' ? 'btn-primary shadow-glow' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          ✏️ Manual
-        </button>
       </div>
-
-      {/* Manual Mode (no camera needed) */}
-      {mode === 'manual' && (
-        <div className="card p-5 mb-6">
-          <h2 className="font-bold text-[var(--text-primary)] mb-3">✏️ Manual Sell</h2>
-          <input
-            value={manualSearch}
-            onChange={e => setManualSearch(e.target.value)}
-            placeholder="Search product name or barcode..."
-            className="form-input w-full mb-3"
-          />
-          <div className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar">
-            {manualResults.map(p => (
-              <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
-                <div className="min-w-0">
-                  <p className="font-medium text-[var(--text-primary)] truncate">{p.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">₹{p.price} · {p.quantity} in stock</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number" min="1" max={p.quantity}
-                    value={manualQty[p.id] ?? 1}
-                    onChange={e => setManualQty(prev => ({ ...prev, [p.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    className="form-input w-16 py-1 text-center"
-                  />
-                  <button onClick={() => manualSell(p)} disabled={p.quantity <= 0} className="btn btn-primary text-sm px-4 py-2 disabled:opacity-40">Sell</button>
-                </div>
-              </div>
-            ))}
-            {manualResults.length === 0 && <p className="text-center text-[var(--text-muted)] py-6">No matching products</p>}
-          </div>
-        </div>
-      )}
 
       {/* AI Scan Mode */}
       {mode === 'ai' && (
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <span className="text-[var(--primary)]">✨</span> AI Scan & Sell
+              <span className="text-green-400">✨</span> AI Scan & Sell
             </h2>
             <span className="text-xs text-[var(--text-muted)]">Point at product → Tap Sell</span>
           </div>
@@ -287,7 +234,7 @@ export default function SellProduct() {
                     {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
                   </select>
                 )}
-                <button onClick={startAICamera} className="btn btn-primary px-8 py-4 text-lg shadow-glow w-full max-w-xs border-0">
+                <button onClick={startAICamera} className="btn bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 text-lg shadow-glow w-full max-w-xs border-0">
                   ✨ Start AI Camera
                 </button>
               </div>
@@ -295,8 +242,8 @@ export default function SellProduct() {
 
             {scanning && (
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between gap-3">
-                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">✕ Stop</button>
-                <button onClick={captureAndSell} disabled={processing} className="btn btn-primary text-lg px-8 py-3 shadow-glow flex-1 border-0 disabled:opacity-50">
+                <button onClick={stopAICamera} className="btn bg-red-600/80 text-white text-sm px-4 py-3 rounded-xl">✕ Stop</button>
+                <button onClick={captureAndSell} disabled={processing} className="btn bg-gradient-to-r from-orange-500 to-red-600 text-white text-lg px-8 py-3 rounded-xl shadow-glow flex-1 border-0 disabled:opacity-50">
                   {processing ? (
                     <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Reading...</span>
                   ) : '📸 Capture & Sell'}
@@ -307,8 +254,8 @@ export default function SellProduct() {
             {processing && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                 <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-[var(--accent-blue)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-white font-bold">Identifying product...</p>
+                  <div className="w-12 h-12 border-4 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-green-300 font-bold">Identifying product...</p>
                 </div>
               </div>
             )}
@@ -336,8 +283,8 @@ export default function SellProduct() {
             )}
             {scanning && (
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">Scanning...</span>
-                <button onClick={stopEverything} className="btn btn-danger btn-sm">Stop</button>
+                <span className="bg-black/70 text-green-400 text-xs px-3 py-2 rounded-full animate-pulse">Scanning...</span>
+                <button onClick={stopEverything} className="bg-red-600/80 text-white text-xs px-4 py-2 rounded-full">Stop</button>
               </div>
             )}
           </div>

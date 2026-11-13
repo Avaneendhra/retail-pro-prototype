@@ -177,10 +177,10 @@ export default function InvoiceScanner() {
 
       {imported && (
         <div className="card overflow-hidden animate-in">
-          <div className="card-accent-blue p-6 text-center text-center">
+          <div className="bg-[var(--success)] p-5 text-white text-center">
             <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <h2 className="text-xl font-bold">Invoice Imported Successfully!</h2>
-            <p className="text-black/70">{results.length} products have been added to your inventory</p>
+            <p className="text-green-100">{results.length} products have been added to your inventory</p>
           </div>
           <div className="p-5">
             <div className="space-y-2 mb-5">
