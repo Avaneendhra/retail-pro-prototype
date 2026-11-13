@@ -11,7 +11,7 @@ export const ThemeProvider = ({ children }) => {
     // 2. Or use system preference
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     // 3. Default to 'dark' as your site is already dark
-    return savedTheme || 'dark';
+    return savedTheme || (prefersDark ? 'dark' : 'light');
   });
 
   useEffect(() => {
