@@ -95,9 +95,9 @@ export const InventoryProvider = ({ children }) => {
 
     // Low-stock notification when this sale crosses the reorder level
     if (remaining <= product.reorderLevel && product.quantity > product.reorderLevel) {
-      showToast?.(`⚠️ Low stock: "${product.name}" has only ${remaining} left (min ${product.reorderLevel})`, 'error');
+      showToast?.(`Low stock: "${product.name}" has only ${remaining} left (min ${product.reorderLevel})`, 'error');
     } else if (remaining === 0) {
-      showToast?.(`⚠️ "${product.name}" is now out of stock`, 'error');
+      showToast?.(`"${product.name}" is now out of stock`, 'error');
     }
     return { success: true, sale, product };
   }, [products, showToast]);

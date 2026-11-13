@@ -1,50 +1,30 @@
-<div align="center">
-
 # Smart Retail
 
-**Smart inventory for small retail stores.**
-Add or deduct stock instantly by scan, forecast demand from real sales, and catch low stock before the shelves go empty.
+Inventory for small retail stores. Add or deduct stock by scan, forecast demand from sales, and see low stock before it runs out.
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_App-B8C7E6?style=for-the-badge&labelColor=0D0D0D)](https://avaneendhra.github.io/retail-pro-prototype/)
-&nbsp;
-![React](https://img.shields.io/badge/React_18-0D0D0D?style=for-the-badge&logo=react&logoColor=B8C7E6)
-![Vite](https://img.shields.io/badge/Vite_4-0D0D0D?style=for-the-badge&logo=vite&logoColor=E2B6D9)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-0D0D0D?style=for-the-badge&logo=tailwindcss&logoColor=B8C7E6)
-![PWA](https://img.shields.io/badge/PWA-Installable-0D0D0D?style=for-the-badge&logo=pwa&logoColor=E2B6D9)
-
-<br />
+[Live demo](https://avaneendhra.github.io/retail-pro-prototype/) · [Run locally](#run-locally)
 
 <a href="https://avaneendhra.github.io/retail-pro-prototype/">
   <img src="docs/dashboard.jpg" alt="Smart Retail dashboard" width="900" />
 </a>
 
-</div>
-
----
-
 ## Try it
 
-**Live app:** https://avaneendhra.github.io/retail-pro-prototype/
+No sign-up or backend. The app ships with sample products and a week of sales, and saves changes in your browser.
 
-No sign-up or backend needed. The app comes loaded with sample products and a week of sales so every screen has data. Everything you do is saved in your own browser, so you can experiment freely.
-
-> **Tip:** Open it on your phone to use the camera for barcode and label scanning. You can also install it to your home screen as an app (PWA).
-
----
+Open it on a phone to use the camera for barcode and label scanning. It can also be installed to the home screen.
 
 ## Features
 
-| | Feature | What it does |
-|---|---|---|
-| ➕ | **Instant stock-in** | Scan a barcode, point the camera at a product label (AI text recognition), or enter it manually. Existing products get their quantity topped up automatically. |
-| 🛒 | **Instant sell / checkout** | Scan or search a product and sell it in one tap. Stock is deducted immediately and a running session total is kept. Works without a camera in **Manual** mode. |
-| 🔮 | **Demand forecasting** | Uses the last 7 days of sales to project next week's demand, estimate how many days until each product runs out, and suggest a reorder quantity. |
-| ⚠️ | **Low-stock notifications** | A toast alert fires the moment a sale drops a product to or below its reorder level, and the dashboard lists every product that needs restocking. |
-| 🧾 | **Invoice import** | Upload a wholesaler's bill to add many products to inventory in one go. |
-| 📊 | **Live dashboard** | Weekly revenue, today's sales vs yesterday, top sellers, stock health, inventory value and stock by category. |
-| 🌗 | **Dark & light themes** | A dark "bento" design by default, with a light mode one click away. Fully responsive, with a bottom nav on mobile. |
-
----
+| Feature | Description |
+|---|---|
+| Stock in | Add products by barcode, by reading the label with the camera, or by hand. Existing products are topped up. |
+| Sell | Scan or search a product and sell it. Stock is deducted immediately. Manual mode works without a camera. |
+| Demand forecast | Projects next week's demand from the last 7 days of sales, with days until stock-out and a suggested reorder quantity. |
+| Low-stock alerts | Notifies you when a sale takes a product to or below its reorder level. |
+| Invoice import | Adds many products at once from a wholesaler bill. |
+| Dashboard | Weekly revenue, today's sales, top sellers, stock health, inventory value and stock by category. |
+| Themes | Dark by default, with a light mode. Responsive down to phone width. |
 
 ## How it works
 
@@ -59,13 +39,11 @@ flowchart LR
     G --> H[Days until stock-out + reorder suggestion]
 ```
 
-**Forecast formula:**
+Forecast:
 
 - `avg per day` = units sold in the last 7 days ÷ 7
 - `runs out in` = current stock ÷ avg per day
 - `suggested reorder` = (expected weekly demand + reorder level) − current stock
-
----
 
 ## Pages
 
@@ -76,8 +54,6 @@ flowchart LR
 | `#/add-stock` | Add stock by AI scan, barcode or manual entry |
 | `#/sell` | Sell by AI scan, barcode or manual search |
 | `#/invoice` | Bulk-import products from a wholesaler invoice |
-
----
 
 ## Tech stack
 
@@ -90,8 +66,6 @@ flowchart LR
 - **Electron** (optional) for a desktop build
 
 Data lives in `localStorage` through `InventoryContext`, so the prototype needs no server.
-
----
 
 ## Run locally
 
@@ -115,9 +89,7 @@ Then open **http://localhost:5173/retail-pro-prototype/**.
 | `npm run electron:start` | Run as a desktop app |
 | `npm run electron:build` | Package a Windows desktop build |
 
-> **Reset the demo data:** open the browser console on the app and run `localStorage.clear()`, then reload.
-
----
+To reset the demo data, run `localStorage.clear()` in the browser console and reload.
 
 ## Project structure
 
@@ -135,8 +107,6 @@ src/
     └── inventory/            # Inventory, AddStock, SellProduct, InvoiceScanner
 ```
 
----
-
 ## Deploying
 
 The app is hosted on **GitHub Pages** from the `gh-pages` branch:
@@ -147,8 +117,6 @@ npm run deploy
 
 The Vite `base` is set to `/retail-pro-prototype/` in `vite.config.mjs`. If you rename the repository, update it to match.
 
----
-
 ## Roadmap
 
 - [ ] Connect to the Spring Boot + MongoDB backend for multi-device sync
@@ -157,10 +125,3 @@ The Vite `base` is set to `/retail-pro-prototype/` in `vite.config.mjs`. If you 
 - [ ] Multi-language UI (English, Hindi, Marathi, Telugu)
 - [ ] Push notifications for low stock
 
----
-
-<div align="center">
-
-Made for small shops that deserve big-store tools.
-
-</div>

@@ -45,7 +45,7 @@ export default function SellProduct() {
     setSessionTotal(prev => prev + p.price * qty);
     setRecentSales(prev => [{ name: p.name, price: p.price * qty, qty, time: Date.now() }, ...prev.slice(0, 19)]);
     setManualQty(prev => ({ ...prev, [p.id]: 1 }));
-    showToast(`✅ Sold ${qty}× "${p.name}" — ₹${p.price * qty}`, 'success');
+    showToast(`Sold ${qty}x "${p.name}" — ₹${p.price * qty}`, 'success');
   };
 
   const videoRef = useRef(null);
@@ -135,13 +135,13 @@ export default function SellProduct() {
 
       const matched = findBestMatch(name);
       if (!matched) {
-        showToast(`"${name}" not found in your inventory!`, 'error');
+        showToast(`"${name}" not found in inventory`, 'error');
         setProcessing(false);
         return;
       }
 
       if (matched.quantity <= 0) {
-        showToast(`"${matched.name}" is out of stock!`, 'error');
+        showToast(`"${matched.name}" is out of stock`, 'error');
         setProcessing(false);
         return;
       }
@@ -149,9 +149,9 @@ export default function SellProduct() {
       sellProduct(matched.id, 1);
       setSessionTotal(prev => prev + matched.price);
       setRecentSales(prev => [{ name: matched.name, price: matched.price, qty: 1, time: Date.now() }, ...prev.slice(0, 19)]);
-      showToast(`✅ Sold 1× "${matched.name}" — ₹${matched.price}`, 'success');
+      showToast(`Sold 1x "${matched.name}" — ₹${matched.price}`, 'success');
     } catch {
-      showToast('AI scan failed. Try again.', 'error');
+      showToast('Could not read the label. Try again.', 'error');
     }
     setProcessing(false);
   }, [products, sellProduct, showToast]);
@@ -169,13 +169,13 @@ export default function SellProduct() {
         const found = findByBarcode(decodedText);
         if (found) {
           if (found.quantity <= 0) {
-            showToast(`"${found.name}" is out of stock!`, 'error');
+            showToast(`"${found.name}" is out of stock`, 'error');
             return;
           }
           sellProduct(found.id, 1);
           setSessionTotal(prev => prev + found.price);
           setRecentSales(prev => [{ name: found.name, price: found.price, qty: 1, time: Date.now() }, ...prev.slice(0, 19)]);
-          showToast(`✅ Sold 1× "${found.name}" — ₹${found.price}`, 'success');
+          showToast(`Sold 1x "${found.name}" — ₹${found.price}`, 'success');
         } else {
           showToast(`Barcode ${decodedText} not found in inventory.`, 'error');
         }
@@ -200,9 +200,9 @@ export default function SellProduct() {
       <div className="page-header">
         <h1 className="page-title flex items-center gap-3">
           <span className="stat-icon green"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" /></svg></span>
-          Sell / Checkout
+          Sell
         </h1>
-        <p className="page-subtitle">Point camera at a product to instantly sell and deduct from inventory</p>
+        <p className="page-subtitle">Scan or search a product. Stock is deducted as you sell.</p>
       </div>
 
       {/* Session Total */}
@@ -223,21 +223,21 @@ export default function SellProduct() {
 
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-6">
-        <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'btn-primary shadow-glow border-0' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          ✨ AI Scan & Sell
+        <button onClick={() => { stopEverything(); setMode('ai'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'ai' ? 'btn-primary border-0' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+          Label scan
         </button>
-        <button onClick={() => { stopEverything(); setMode('barcode'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'barcode' ? 'btn-primary shadow-glow' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          📊 Barcode Scan
+        <button onClick={() => { stopEverything(); setMode('barcode'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'barcode' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+          Barcode
         </button>
-        <button onClick={() => { stopEverything(); setMode('manual'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'manual' ? 'btn-primary shadow-glow' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
-          ✏️ Manual
+        <button onClick={() => { stopEverything(); setMode('manual'); }} className={`btn flex-1 py-3 text-sm font-bold transition-all ${mode === 'manual' ? 'btn-primary' : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-secondary)]'}`}>
+          Manual
         </button>
       </div>
 
       {/* Manual Mode (no camera needed) */}
       {mode === 'manual' && (
         <div className="card p-5 mb-6">
-          <h2 className="font-bold text-[var(--text-primary)] mb-3">✏️ Manual Sell</h2>
+          <h2 className="font-bold text-[var(--text-primary)] mb-3">Manual</h2>
           <input
             value={manualSearch}
             onChange={e => setManualSearch(e.target.value)}
@@ -272,9 +272,9 @@ export default function SellProduct() {
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] flex items-center justify-between">
             <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <span className="text-[var(--primary)]">✨</span> AI Scan & Sell
+              Label scan
             </h2>
-            <span className="text-xs text-[var(--text-muted)]">Point at product → Tap Sell</span>
+            <span className="text-xs text-[var(--text-muted)]">Point at the product, then capture</span>
           </div>
           <div className="relative bg-black" style={{ minHeight: '320px' }}>
             <video ref={videoRef} className="w-full" style={{ display: scanning ? 'block' : 'none' }} playsInline muted />
@@ -287,19 +287,19 @@ export default function SellProduct() {
                     {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
                   </select>
                 )}
-                <button onClick={startAICamera} className="btn btn-primary px-8 py-4 text-lg shadow-glow w-full max-w-xs border-0">
-                  ✨ Start AI Camera
+                <button onClick={startAICamera} className="btn btn-primary px-8 py-4 w-full max-w-xs border-0">
+                  Start camera
                 </button>
               </div>
             )}
 
             {scanning && (
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-between gap-3">
-                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">✕ Stop</button>
-                <button onClick={captureAndSell} disabled={processing} className="btn btn-primary text-lg px-8 py-3 shadow-glow flex-1 border-0 disabled:opacity-50">
+                <button onClick={stopAICamera} className="btn btn-danger text-sm px-5 py-3">Stop</button>
+                <button onClick={captureAndSell} disabled={processing} className="btn btn-primary text-lg px-8 py-3 flex-1 border-0 disabled:opacity-50">
                   {processing ? (
                     <span className="flex items-center justify-center gap-2"><span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Reading...</span>
-                  ) : '📸 Capture & Sell'}
+                  ) : 'Capture'}
                 </button>
               </div>
             )}
@@ -320,7 +320,7 @@ export default function SellProduct() {
       {mode === 'barcode' && (
         <div className="card p-0 overflow-hidden mb-6">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
-            <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">📊 Barcode Scanner</h2>
+            <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">Barcodener</h2>
           </div>
           <div className="relative bg-black" style={{ minHeight: '300px' }}>
             <div id="sell-reader" className="w-full" />
@@ -331,12 +331,12 @@ export default function SellProduct() {
                     {cameras.map(c => <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0,8)}`}</option>)}
                   </select>
                 )}
-                <button onClick={startBarcodeScanner} className="btn btn-primary px-8 py-3 text-lg shadow-glow w-full max-w-xs">📊 Start Scanner</button>
+                <button onClick={startBarcodeScanner} className="btn btn-primary px-8 py-3 w-full max-w-xs">Start scanner</button>
               </div>
             )}
             {scanning && (
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center">
-                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">Scanning...</span>
+                <span className="bg-black/70 text-[var(--primary)] text-xs px-3 py-2 rounded-full animate-pulse">Scanning</span>
                 <button onClick={stopEverything} className="btn btn-danger btn-sm">Stop</button>
               </div>
             )}
@@ -348,7 +348,7 @@ export default function SellProduct() {
       {recentSales.length > 0 && (
         <div className="card p-5">
           <h3 className="font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            🧾 Sales This Session ({recentSales.length})
+            This session ({recentSales.length})
           </h3>
           <div className="space-y-2">
             {recentSales.map((item, i) => (

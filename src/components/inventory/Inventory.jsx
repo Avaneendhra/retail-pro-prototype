@@ -20,9 +20,9 @@ export default function Inventory() {
         <div>
           <h1 className="page-title flex items-center gap-3">
             <span className="stat-icon blue"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg></span>
-            Inventory Management
+            Inventory
           </h1>
-          <p className="page-subtitle">View and manage your entire stock catalog</p>
+          <p className="page-subtitle">Every product, its price and how much is on the shelf.</p>
         </div>
         <div className="card card-accent-blue px-7 py-5 flex items-center gap-6">
           <div>
@@ -100,7 +100,6 @@ export default function Inventory() {
               ) : (
                 <tr>
                   <td colSpan="5" className="text-center py-12">
-                    <div className="text-5xl mb-3">🔍</div>
                     <p className="text-[var(--text-primary)] font-bold text-lg mb-1">No products found</p>
                     <p className="text-[var(--text-muted)]">Try adjusting your search or filters</p>
                   </td>
