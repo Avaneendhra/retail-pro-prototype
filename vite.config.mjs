@@ -10,9 +10,6 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png'],
-      devOptions: {
-        enabled: true
-      },
       workbox: {
         // include the barcode engine (.wasm) so scanning works offline too
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,wasm}'],
