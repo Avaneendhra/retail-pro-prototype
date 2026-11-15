@@ -1,0 +1,19 @@
+{
+  "name": "stokd-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "stokd API: accounts and multi-device sync",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/node.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "hono": "^4.13.18",
+    "zod": "^4.6.7"
+  }
+}

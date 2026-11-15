@@ -7,8 +7,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "vite build && gh-pages -d dist",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "npm run test:server && vitest run",
+    "test:watch": "vitest",
+    "test:server": "npm --prefix server test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
