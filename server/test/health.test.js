@@ -21,8 +21,8 @@ test('unknown routes return a JSON 404', async () => {
   assert.equal(res.json.error.code, 'not_found');
 });
 
-test('an unexpected failure returns a JSON 500 without leaking details', async () => {
-  const { app, db } = makeApp();
+test('an unexpected failure returns a JSON 500 without leaking details, and is logged', async () => {
+  const { app, db, logs } = makeApp();
   db.query = async () => { throw new Error('disk on fire at /secret/path'); };
   app.get('/api/boom', async (c) => { await c.get('ctx').db.query('SELECT 1'); return c.text('unreachable'); });
 
@@ -30,6 +30,8 @@ test('an unexpected failure returns a JSON 500 without leaking details', async (
 
   assert.equal(res.status, 500);
   assert.deepEqual(res.json, { error: { code: 'server_error', message: 'Something went wrong. Please try again.' } });
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /disk on fire/);
 });
 
 test('config refuses a missing or short JWT_SECRET', () => {
