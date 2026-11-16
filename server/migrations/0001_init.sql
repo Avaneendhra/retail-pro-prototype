@@ -49,6 +49,7 @@ CREATE TABLE products (
   needs_review INTEGER NOT NULL DEFAULT 0,
   deleted INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
+  created_by TEXT,
   seq INTEGER NOT NULL,
   PRIMARY KEY (shop_id, id)
 );

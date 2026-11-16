@@ -97,7 +97,7 @@ const loginField = z.string().max(254).transform((value, ctx) => {
   return login;
 });
 const authKeyField = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid key.');
-const deviceIdField = z.string().min(8).max(64).regex(/^[\w-]+$/);
+export const deviceIdField = z.string().min(8).max(64).regex(/^[\w-]+$/);
 const deviceNameField = z.string().max(80).optional();
 
 const SignupBody = z.object({

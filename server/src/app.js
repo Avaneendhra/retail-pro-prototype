@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { HttpError } from './errors.js';
 import { authRoutes } from './auth.js';
+import { syncRoutes } from './sync.js';
 
 /**
  * Builds the API. `resolve(c)` supplies what differs between runtimes:
@@ -30,6 +31,7 @@ export function createApp(resolve) {
   });
 
   authRoutes(app);
+  syncRoutes(app);
 
   return app;
 }
