@@ -115,7 +115,7 @@ const PasswordBody = z.object({ currentAuthKey: authKeyField, authKey: authKeyFi
 
 const publicUser = (row) => ({ id: row.id, name: row.name, login: row.login, role: row.role });
 
-const parseJson = (text, fallback) => {
+export const parseJson = (text, fallback) => {
   try { return JSON.parse(text); } catch { return fallback; }
 };
 
