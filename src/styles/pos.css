@@ -203,7 +203,8 @@ html[lang="te"] .page-title, html[lang="hi"] .page-title, html[lang="mr"] .page-
 }
 
 /* Toasts */
-.account-pill { white-space: nowrap; cursor: pointer; background: transparent; }
+.account-pill { white-space: nowrap; cursor: pointer; }
+.status-pill.account-pill { background: transparent; color-scheme: inherit; }
 .choice-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; cursor: pointer; }
 .choice-row input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent-blue); flex-shrink: 0; }
 
@@ -233,4 +234,11 @@ html[lang="te"] .page-title, html[lang="hi"] .page-title, html[lang="mr"] .page-
 @media (prefers-reduced-motion: reduce) {
   .toast, .animate-in, .auto-flash, .mobile-pay-bar { animation: none; }
   .start-spinner { animation-duration: 2.4s; }
+}
+
+/* Phones: the top bar also carries the account button, so everything gets a little tighter. */
+@media (max-width: 480px) {
+  .topbar .brand-word { display: none !important; }
+  .topbar-actions { gap: 6px; min-width: 0; }
+  .account-pill { max-width: 132px; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; font-size: 12px; height: 32px; display: inline-flex; align-items: center; }
 }

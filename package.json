@@ -9,7 +9,13 @@
     "deploy": "vite build && gh-pages -d dist",
     "test": "npm run test:server && vitest run",
     "test:watch": "vitest",
-    "test:server": "npm --prefix server test"
+    "test:server": "npm --prefix server test",
+    "build:app": "vite build --mode app",
+    "dev:api": "node server/src/node.js",
+    "start": "npm run build:app && node server/src/node.js",
+    "smoke": "node server/scripts/smoke.mjs",
+    "launch": "npm run build:app && npm --prefix server run deploy",
+    "postinstall": "npm --prefix server install --no-audit --no-fund"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
