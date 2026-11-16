@@ -47,3 +47,9 @@ describe('deriveAuthKey', () => {
     expect(await deriveAuthKey('a@b.co', 'correct horse', 1000)).toBe(expected);
   });
 });
+
+it('says so plainly when the browser will not do the password maths (a page not served over https)', async () => {
+  const fail = await deriveAuthKey('a@example.com', 'pw', 10, {}).catch((error) => error);
+
+  expect(fail.code).toBe('insecure_context');
+});

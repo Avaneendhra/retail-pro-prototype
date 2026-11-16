@@ -36,9 +36,11 @@ export function normalizeLogin(raw) {
  * Stretches a password in the browser before it is sent. The server only ever
  * sees this key, never the password. `login` must already be normalised.
  */
-export async function deriveAuthKey(login, password, iterations = KDF_ITERATIONS) {
-  const material = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
+export async function deriveAuthKey(login, password, iterations = KDF_ITERATIONS, { subtle } = globalThis.crypto ?? {}) {
+  // Browsers only offer this on https pages (and localhost).
+  if (!subtle) throw Object.assign(new Error('Sign-in needs a secure (https) address.'), { code: 'insecure_context' });
+  const material = await subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: encoder.encode(`stokd:v1:${login}`), iterations },
     material,
     256,
