@@ -72,38 +72,64 @@ How the numbers are worked out:
 | `#/invoices` | Supplier invoice upload and review |
 | `#/orders` | Purchase orders |
 
+## Accounts and sync
+
+stokd works without an account: everything is kept on the device. With a free shop account, the same stock, bills and orders appear on every phone and computer the shop uses.
+
+- **Offline first.** A sale shows at once and is saved on the device. It is sent when the internet is there.
+- **Never counted twice, never lost.** Every change has its own id, and stock moves by amounts ("minus 2"), so two tills selling at the same time add up correctly.
+- **Owner and staff logins.** Sign in with a phone number or email and a password. A recovery code replaces email and SMS, so nothing costs money.
+- **Free to run.** The server is one small program on a SQLite database. It runs on Cloudflare's free plan, or on any computer with Node.
+
+See **[docs/LAUNCH.md](docs/LAUNCH.md)** for putting it online.
+
 ## Tech stack
 
-- **React 18** + **React Router** (hash routing, works on GitHub Pages)
-- **Vite 4** and **vite-plugin-pwa** (offline support, installable app)
+**App**
+
+- **React 18** + **React Router 7** (hash routing, works on GitHub Pages)
+- **Vite 8** and **vite-plugin-pwa** (offline support, installable app)
 - **Tailwind CSS 3** with a CSS-variable design system
+- **IndexedDB** for the shop's data on the device, with a queue of changes waiting to be sent
 - **zxing-wasm** (ZXing C++ in WebAssembly) for barcodes, using the browser's own BarcodeDetector when available
 - **Tesseract.js** for on-device reading of labels and invoices
 - **i18next** for the four languages
 
-Everything runs in the browser and data is kept in `localStorage`. Claude vision is supported as an optional extra (Settings → API key) but is not needed.
+**Server** (`server/`)
+
+- **Hono** API with **zod** validation
+- **SQLite**: Cloudflare **D1** when hosted on Workers, a plain file through Node's built-in driver otherwise
+- Passwords are stretched in the browser (PBKDF2, 600,000 rounds) and only a salted hash is stored
+
+**Tests**: `node --test` for the server, **Vitest** + Testing Library for the app. The app's sync tests run two simulated devices against the real server code.
+
+Claude vision is supported as an optional extra (Settings → API key) but is not needed.
 
 ## Run locally
 
-Requires Node.js 18 or newer.
+Requires Node.js 22.13 or newer.
 
 ```bash
 git clone https://github.com/Avaneendhra/retail-pro-prototype.git
 cd retail-pro-prototype
 npm install
-npm run dev
+npm start
 ```
 
-Then open http://localhost:5173/retail-pro-prototype/
+Then open http://localhost:8787. That one command builds the app and starts the server with its database in `server/data/`.
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve the production build |
+| `npm start` | Build the app and run it with the server on port 8787 |
+| `npm run dev` | App only, with hot reload, at http://localhost:5173/retail-pro-prototype/ |
+| `npm run dev:api` | Server only (the dev app talks to it automatically) |
+| `npm test` | All server and app tests |
+| `npm run smoke -- http://localhost:8787` | Check a running server end to end |
+| `npm run build` | Build for GitHub Pages into `dist/` |
 | `npm run deploy` | Build and publish to GitHub Pages |
+| `npm run launch` | Build and deploy to Cloudflare (see docs/LAUNCH.md) |
 
-To reset the demo data, use **Settings → Reset demo data**.
+Without an account, **Settings → Reset demo data** restores the sample shop.
 
 ## Project structure
 
@@ -111,21 +137,36 @@ To reset the demo data, use **Settings → Reset demo data**.
 src/
 ├── main.jsx                     Routes and providers
 ├── i18n.js, locales/app/        English, Telugu, Hindi, Marathi
-├── data/seed.js                 Demo products and 4 weeks of sales
-├── context/InventoryContext.jsx Products, bills, stock updates, purchase orders
-├── lib/
-│   ├── insights.js              Velocity, trends, forecasts, recommendations
-│   ├── scanEngine.js            Camera, barcode detection, label OCR
-│   ├── productLookup.js         Barcode databases, label parsing, matching
-│   ├── invoiceParser.js         Invoice text → supplier, number, items
-│   └── install.js               "Install app" prompt
+├── data/seed.js                 Sample products and 4 weeks of sales
+├── store/                       The shop's data, with no React in it
+│   ├── engine.js                Local mode, accounts, the queue of unsent changes, sync
+│   ├── ops.js, merge.js         What each change does; folding in rows from the server
+│   ├── storage.js               IndexedDB (with a memory fallback that says so)
+│   ├── api.js, ids.js           HTTP client; bill, order and product numbers
+│   └── legacy.js, history.js    Taking over data saved by older versions
+├── context/
+│   ├── InventoryContext.jsx     useInventory() and useAccount() for the screens
+│   └── boot.js                  Starts the engine once per page
+├── lib/                         Insights, scanning, label and invoice reading
 └── components/
     ├── billing/                 Home (POS) and barcode scanner
-    ├── dashboard/               Forecasts and insights
-    ├── inventory/               Inventory and Add Product
-    ├── invoice/                 Supplier invoice reading and review
-    ├── orders/                  Purchase orders
-    └── layout/                  Top bar, logo, language menu, settings
+    ├── account/                 Sign in, create account, sync status, staff logins
+    ├── dashboard/, inventory/, invoice/, orders/
+    └── layout/                  Top bar, start-up screens, settings
+
+server/
+├── migrations/                  Database schema
+├── src/
+│   ├── app.js                   The API (same code on Cloudflare and Node)
+│   ├── auth.js, team.js         Accounts, tokens, staff logins
+│   ├── ops.js, sync.js          Applying changes; POST /api/sync
+│   ├── db/                      SQLite adapters: Node file and Cloudflare D1
+│   ├── node.js, worker.js       The two ways to run it
+├── scripts/smoke.mjs            End-to-end check of a running server
+└── test/                        Server tests
+
+shared/auth.js                   Login clean-up and password stretching (app and server)
+docs/LAUNCH.md                   How to put it online
 ```
 
 ## Contributing
@@ -134,7 +175,7 @@ Work happens on a branch and is merged into `master` through a pull request. Git
 
 ## Roadmap
 
-- [ ] Sync across devices (backend)
+- [x] Accounts and sync across devices
 - [ ] GST invoices
 - [ ] Customer records and loyalty
 - [ ] Push notifications for low stock

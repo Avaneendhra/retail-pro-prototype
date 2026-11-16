@@ -10,11 +10,18 @@ import { InventoryProvider } from "./context/InventoryContext";
 
 import AppShell from "./components/layout/AppShell";
 import Billing from "./components/billing/Billing";
-import Dashboard from "./components/dashboard/Dashboard";
-import Inventory from "./components/inventory/Inventory";
-import AddStock from "./components/inventory/AddStock";
-import SupplierInvoice from "./components/invoice/SupplierInvoice";
-import PurchaseOrders from "./components/orders/PurchaseOrders";
+import { Splash } from "./components/layout/StartScreens";
+
+// Home opens at once; the other pages are fetched the first time they are opened.
+const lazyPage = (load) => {
+  const Page = React.lazy(load);
+  return () => <React.Suspense fallback={<Splash />}><Page /></React.Suspense>;
+};
+const Dashboard = lazyPage(() => import("./components/dashboard/Dashboard"));
+const Inventory = lazyPage(() => import("./components/inventory/Inventory"));
+const AddStock = lazyPage(() => import("./components/inventory/AddStock"));
+const SupplierInvoice = lazyPage(() => import("./components/invoice/SupplierInvoice"));
+const PurchaseOrders = lazyPage(() => import("./components/orders/PurchaseOrders"));
 
 const router = createHashRouter([
   {

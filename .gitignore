@@ -1,5 +1,13 @@
 node_modules/
 dist/
-dist_electron/
 dev-dist/
 *.log
+.env
+.env.local
+
+# stokd server: its database, secret and the built app
+server/data/
+server/public/
+server/.wrangler/
+server/.dev.vars
+dist_electron/

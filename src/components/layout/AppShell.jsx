@@ -6,6 +6,8 @@ import { useInventory } from '../../context/InventoryContext';
 import { LANGUAGES } from '../../i18n';
 import { pname } from '../../lib/format';
 import SettingsModal from './SettingsModal';
+import StorageNotice from './StorageNotice';
+import AccountButton from '../account/AccountButton';
 import Logo from './Logo';
 
 const I = {
@@ -127,6 +129,7 @@ export default function AppShell() {
         </nav>
 
         <div className="topbar-actions">
+          <AccountButton />
           <LanguageMenu />
           <NotificationMenu />
           <button onClick={() => setSettingsOpen(true)} className="icon-pill" aria-label={t('topbar.settings')} title={t('topbar.settings')}>{I.gear}</button>
@@ -137,6 +140,7 @@ export default function AppShell() {
       </header>
 
       <main className="main-content">
+        <StorageNotice />
         <div className="animate-in" key={pathname}>
           <Outlet />
         </div>

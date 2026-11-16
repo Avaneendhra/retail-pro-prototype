@@ -1,0 +1,21 @@
+// Cloudflare Workers: one address serves the API and the app. Free plan is enough.
+// docs/LAUNCH.md walks through the three commands that fill in database_id and deploy.
+{
+  "name": "stokd",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "stokd",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": { "APP_VERSION": "1.0.0" }
+}

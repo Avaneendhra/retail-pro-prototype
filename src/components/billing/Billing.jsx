@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Fuse from 'fuse.js';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
-import { useOnline, useSettings } from '../../lib/settings';
+import { useOnline } from '../../lib/settings';
 import { inr, pname, fmtDate, fmtTime } from '../../lib/format';
 import Modal from '../common/Modal';
 import BarcodeScanModal from './BarcodeScanModal';
@@ -14,10 +14,9 @@ const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAR
 
 export default function Billing() {
   const { t, i18n } = useTranslation();
-  const { products, sales, bills, nextBillNo, byId, findByCode, findByBarcode, checkout } = useInventory();
+  const { products, sales, bills, nextBillNo, shopName, byId, findByCode, findByBarcode, checkout } = useInventory();
   const { showToast } = useToast();
   const online = useOnline();
-  const [settings] = useSettings();
 
   const [cart, setCart] = useState([]);            // [{ productId, qty }]
   const [flashId, setFlashId] = useState(null);
@@ -138,7 +137,7 @@ export default function Billing() {
   useEffect(() => { if (result) setTimeout(() => nextSaleRef.current?.focus(), 80); }, [result]);
 
   const methodLabel = (m) => t(`billing.${m}`);
-  const todayBills = bills.filter(b => b.date >= new Date().setHours(0, 0, 0, 0));
+  const todayBills = bills.filter(b => b.at >= new Date().setHours(0, 0, 0, 0));
 
   return (
     <div className="billing">
@@ -384,8 +383,8 @@ export default function Billing() {
       {/* Printable receipt */}
       {result && (
         <div className="print-area" aria-hidden="true">
-          <h2>{settings.shopName}</h2>
-          <p>#{result.bill.billNo} · {fmtDate(result.bill.date)} {fmtTime(result.bill.date)}</p>
+          <h2>{shopName}</h2>
+          <p>#{result.bill.billNo} · {fmtDate(result.bill.at)} {fmtTime(result.bill.at)}</p>
           <table>
             <tbody>
               {result.bill.items.map(i => (
