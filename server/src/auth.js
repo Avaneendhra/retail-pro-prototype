@@ -77,7 +77,8 @@ export async function readBody(c, schema) {
   let raw;
   try {
     raw = await c.req.json();
-  } catch {
+  } catch (error) {
+    if (error?.name === 'BodyLimitError') throw error; // answered as 413 by the app
     throw fail(400, 'invalid_input', 'The request could not be read.');
   }
   const parsed = schema.safeParse(raw);
@@ -88,7 +89,7 @@ export async function readBody(c, schema) {
   return parsed.data;
 }
 
-const loginField = z.string().max(254).transform((value, ctx) => {
+export const loginField = z.string().max(254).transform((value, ctx) => {
   const login = normalizeLogin(value);
   if (!login) {
     ctx.addIssue({ code: 'custom', message: 'Enter a phone number or an email address.' });
@@ -96,7 +97,7 @@ const loginField = z.string().max(254).transform((value, ctx) => {
   }
   return login;
 });
-const authKeyField = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid key.');
+export const authKeyField = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid key.');
 export const deviceIdField = z.string().min(8).max(64).regex(/^[\w-]+$/);
 const deviceNameField = z.string().max(80).optional();
 
