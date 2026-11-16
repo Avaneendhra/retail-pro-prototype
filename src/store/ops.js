@@ -52,6 +52,15 @@ export function insertNewestFirst(rows, row, key) {
   return index === -1 ? [...rows, row] : [...rows.slice(0, index), row, ...rows.slice(index)];
 }
 
+/** Products are always kept in the same order on every device: oldest first, then by id. */
+export const byCreation = (a, b) => (a.createdAt - b.createdAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+function addProduct(products, product) {
+  const last = products[products.length - 1];
+  const next = [...products, product];
+  return last && byCreation(last, product) > 0 ? next.sort(byCreation) : next;
+}
+
 const has = (rows, id) => rows.some((row) => row.id === id);
 const replace = (rows, id, change) => rows.map((row) => (row.id === id ? change(row) : row));
 
@@ -74,7 +83,7 @@ const HANDLERS = {
 
   'product.create'(data, op) {
     if (has(data.products, op.product.id)) return data;
-    return { ...data, products: [...data.products, normalizeProduct(op.product, op.at)] };
+    return { ...data, products: addProduct(data.products, normalizeProduct(op.product, op.at)) };
   },
 
   'product.update'(data, op) {
@@ -132,7 +141,7 @@ const HANDLERS = {
         if (!has(next[key], row.id)) next = { ...next, [key]: insert(next[key], row) };
       }
     };
-    add('products', op.products, (rows, p) => [...rows, normalizeProduct(p, op.at)]);
+    add('products', op.products, (rows, p) => addProduct(rows, normalizeProduct(p, op.at)));
     add('bills', op.bills, (rows, b) => insertNewestFirst(rows, b, 'at'));
     add('purchaseOrders', op.purchaseOrders, (rows, o) => insertNewestFirst(rows, normalizePo(o), 'createdAt'));
     add('invoices', op.invoices, (rows, i) => insertNewestFirst(rows, i, 'at'));

@@ -2,7 +2,7 @@
 // readLegacy turns that into a dataset for the new store; clearLegacy removes
 // the old copy once the new one has been saved.
 import { SEED_PRODUCTS } from '../data/seed.js';
-import { normalizeProduct } from './ops.js';
+import { normalizeProduct, byCreation } from './ops.js';
 import { dayBills } from './history.js';
 
 const KEYS = {
@@ -47,7 +47,8 @@ export function readLegacy(ls) {
 
   const products = oldProducts
     .filter((p) => p && p.id && p.name)
-    .map((p) => normalizeProduct({ ...p, barcode: fixBarcode(p), needsReview: Boolean(p.needsReview), createdAt: p.addedAt ?? p.createdAt ?? now }, now));
+    .map((p) => normalizeProduct({ ...p, barcode: fixBarcode(p), needsReview: Boolean(p.needsReview), createdAt: p.addedAt ?? p.createdAt ?? now }, now))
+    .sort(byCreation);
 
   const bills = list(read(ls, KEYS.bills))
     .filter((b) => b && b.id && list(b.items).length)

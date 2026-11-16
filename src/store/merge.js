@@ -1,4 +1,5 @@
 // Takes the rows a sync returned and folds them into the data on this device.
+import { byCreation } from './ops.js';
 
 const newestFirst = (key) => (a, b) => b[key] - a[key] || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
 
@@ -32,7 +33,7 @@ export function pruneBills(data, billsSince) {
  * Bills older than `billsSince` are not kept on the device (the server keeps them).
  */
 export function mergeChanges(data, changes, { billsSince = 0 } = {}) {
-  const products = mergeRows(data.products, changes.products);
+  const products = mergeRows(data.products, changes.products, byCreation);
   const bills = mergeRows(data.bills, changes.bills, newestFirst('at'));
   const purchaseOrders = mergeRows(data.purchaseOrders, changes.purchaseOrders, newestFirst('createdAt'));
   const invoices = mergeRows(data.invoices, changes.invoices, newestFirst('at'));
