@@ -2,6 +2,8 @@
 // Every product has a short code (fast billing), a product ID, and names
 // in English, Telugu, Hindi and Marathi.
 
+import { dayBills } from '../store/history.js';
+
 const DAY = 86400000;
 
 // rate  = base units sold per day (used only to generate history)
@@ -89,7 +91,27 @@ export function generateSalesHistory(products, now = Date.now()) {
   return sales.filter(s => s.date <= now);
 }
 
-export function seedProducts() {
+export function seedProducts(now = Date.now()) {
   // strip generator-only fields
-  return SEED_PRODUCTS.map(({ rate, trend, ...p }) => ({ ...p, addedAt: Date.now() }));
+  return SEED_PRODUCTS.map(({ rate, trend, ...p }) => ({ ...p, needsReview: false, createdAt: now }));
+}
+
+/**
+ * The sample shop a new device starts with: the catalogue, four weeks of
+ * history as one summary bill per day, and numbering that continues after it.
+ */
+export function seedDataset(now = Date.now()) {
+  return {
+    data: {
+      products: seedProducts(now),
+      bills: dayBills(generateSalesHistory(SEED_PRODUCTS, now)),
+      purchaseOrders: [],
+      invoices: [],
+      shop: { name: 'My Store' },
+    },
+    outbox: [],
+    cursor: 0,
+    counters: { bill: 1025, po: 101, sku: 1017 },
+    device: { id: null, no: 0 },
+  };
 }
