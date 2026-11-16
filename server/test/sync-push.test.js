@@ -96,6 +96,19 @@ test('stock.move adds stock and records the invoice', async () => {
   assert.deepEqual({ ...invoice }, { supplier: 'ABC Distributors', invoice_no: 'INV-1025', units: 50, line_count: 1 });
 });
 
+test('an invoice whose lines were all new products is still recorded', async () => {
+  const { app, db, owner } = await shopWithMilk();
+  const invoice = { id: 'INV-A2', supplier: 'ABC Distributors', invoiceNo: 'INV-1026', dateText: '', units: 12, count: 1, at: T0 };
+
+  const res = await sync(app, owner.token, { ops: [{ id: opId(), type: 'stock.move', at: T0, reason: 'invoice', lines: [], invoice }] });
+  const empty = await sync(app, owner.token, { ops: [{ id: opId(), type: 'stock.move', at: T0, reason: 'manual', lines: [] }] });
+
+  assert.deepEqual(res.rejected, []);
+  assert.equal((await one(db, 'SELECT COUNT(*) AS n FROM invoices')).n, 1);
+  assert.equal(await stockOf(db, 'P1'), 40);
+  assert.match(empty.rejected[0].reason, /^invalid/, 'a stock move with nothing in it is a mistake');
+});
+
 test('product.create adds a product; creating the same id again keeps the first', async () => {
   const { app, db, owner } = await shopWithMilk();
 

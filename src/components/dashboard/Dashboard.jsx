@@ -34,7 +34,7 @@ export default function Dashboard() {
   const hot = [...sum.days].map(d => d.revenue).sort((a, b) => b - a)[2] ?? 0;
   const today = sum.days[6], yesterday = sum.days[5];
   const delta = yesterday.revenue > 0 ? ((today.revenue - yesterday.revenue) / yesterday.revenue) * 100 : null;
-  const billsToday = bills.filter(b => b.date >= startOfDay(0)).length;
+  const billsToday = bills.filter(b => b.at >= startOfDay(0)).length;
   const healthy = products.filter(p => stats[p.id].status === 'ok').length;
 
   const orderAll = () => {
@@ -215,7 +215,7 @@ export default function Dashboard() {
             {bills.slice(0, 6).map(b => (
               <div key={b.id} className="flex items-center gap-4 py-3 text-sm">
                 <span className="font-mono text-[var(--text-secondary)] w-16">#{b.billNo}</span>
-                <span className="text-[var(--text-muted)] w-20">{fmtTime(b.date)}</span>
+                <span className="text-[var(--text-muted)] w-20">{fmtTime(b.at)}</span>
                 <span className="flex-1 truncate">{b.items.map(i => `${pname(i)} ×${i.qty}`).join(', ')}</span>
                 <span className="font-semibold">{inr(b.total)}</span>
               </div>

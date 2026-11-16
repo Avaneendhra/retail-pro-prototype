@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../common/Modal';
 import { useSettings } from '../../lib/settings';
-import { useInventory } from '../../context/InventoryContext';
+import { useInventory, useAccount } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
 import { useInstall } from '../../lib/install';
 
 export default function SettingsModal({ open, onClose }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useSettings();
-  const { resetDemo } = useInventory();
+  const { resetDemo, shopName, setShopName, mode } = useInventory();
+  const { account } = useAccount();
+  const canRename = mode === 'local' || account?.user.role === 'owner';
   const { showToast } = useToast();
   const { installed, canPrompt, iosHint, install } = useInstall();
   const [key, setKey] = useState('');
-  const [shop, setShop] = useState(settings.shopName);
+  const [shop, setShop] = useState(shopName);
   const hasKey = !!settings.apiKey;
 
   const saveKey = () => {
@@ -25,11 +27,11 @@ export default function SettingsModal({ open, onClose }) {
 
   return (
     <Modal open={open} onClose={onClose} title={t('settings.title')}
-      footer={<button className="btn btn-cta" onClick={() => { setSettings({ shopName: shop.trim() || 'My Store' }); onClose(); }}>{t('common.save')}</button>}>
+      footer={<button className="btn btn-cta" onClick={() => { if (canRename && shop.trim() && shop.trim() !== shopName) setShopName(shop); onClose(); }}>{t('common.save')}</button>}>
       <div className="space-y-7">
         <section>
           <label className="field-label" htmlFor="shop-name">{t('settings.shop')}</label>
-          <input id="shop-name" className="form-input" value={shop} onChange={e => setShop(e.target.value)} />
+          <input id="shop-name" className="form-input" value={shop} maxLength={80} disabled={!canRename} onChange={e => setShop(e.target.value)} />
         </section>
 
         <section>
@@ -59,12 +61,14 @@ export default function SettingsModal({ open, onClose }) {
             : <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{iosHint ? t('install.ios') : t('install.manual')}</p>}
         </section>
 
-        <section>
-          <h3 className="font-semibold mb-2">{t('settings.dataTitle')}</h3>
-          <button className="btn btn-secondary btn-sm" onClick={() => {
-            if (window.confirm(t('settings.resetConfirm'))) { resetDemo(); showToast(t('settings.resetDone'), 'success'); onClose(); }
-          }}>{t('settings.reset')}</button>
-        </section>
+        {mode === 'local' && (
+          <section>
+            <h3 className="font-semibold mb-2">{t('settings.dataTitle')}</h3>
+            <button className="btn btn-secondary btn-sm" onClick={() => {
+              if (window.confirm(t('settings.resetConfirm'))) { resetDemo(); showToast(t('settings.resetDone'), 'success'); onClose(); }
+            }}>{t('settings.reset')}</button>
+          </section>
+        )}
       </div>
     </Modal>
   );

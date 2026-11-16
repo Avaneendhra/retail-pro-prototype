@@ -371,6 +371,73 @@ it('a change is sent soon after it is made, once for several changes', async () 
   expect(await server.stock('P1')).toBe(38);
 });
 
+it('shows the next bill, order and product numbers', async () => {
+  const server = makeServer();
+  const a = makeDevice(server);
+  await a.engine.start();
+  const local = a.view().numbers;
+  await a.engine.signUp({ ...OWNER, keepDeviceData: true });
+  const account = a.view().numbers;
+
+  a.sell([['P1', 1]]);
+
+  expect(local).toEqual({ code: '', bill: 1025, po: 101, sku: 1017 });
+  expect(account).toEqual({ code: 'A', bill: 1025, po: 101, sku: 1017 });
+  expect(a.view().numbers.bill).toBe(1026);
+});
+
+const draftOrder = { id: 'POA101', poNo: 'A101', supplier: '', status: 'draft', items: [{ productId: 'P1', qty: 10 }], createdAt: T0 };
+
+it('quick edits to the same order are sent as one change', async () => {
+  const { server, a } = await shopWithOwner();
+  a.engine.dispatch('po.create', { po: draftOrder });
+  await a.engine.syncNow();
+  const requests = server.net.syncBodies.length;
+
+  for (const supplier of ['A', 'AB', 'ABC']) a.engine.dispatch('po.update', { poId: 'POA101', patch: { supplier } }, { coalesce: true });
+  a.engine.dispatch('po.update', { poId: 'POA101', patch: { items: [{ productId: 'P1', qty: 12 }] } }, { coalesce: true });
+  const waiting = a.view();
+  await a.engine.syncNow();
+
+  expect(waiting.sync.pending).toBe(1);
+  expect(waiting.data.purchaseOrders[0]).toMatchObject({ supplier: 'ABC', items: [{ productId: 'P1', qty: 12 }] });
+  expect(server.net.syncBodies[requests].ops.map((op) => op.patch)).toEqual([{ supplier: 'ABC', items: [{ productId: 'P1', qty: 12 }] }]);
+  expect(a.data().purchaseOrders[0]).toMatchObject({ supplier: 'ABC', items: [{ productId: 'P1', qty: 12 }] });
+});
+
+it('an edit is never merged into a change that may already have reached the server, or into a different thing', async () => {
+  const { server, a } = await shopWithOwner();
+  a.engine.dispatch('po.create', { po: draftOrder });
+  await a.engine.syncNow();
+
+  server.net.loseResponses = 1;
+  a.engine.dispatch('po.update', { poId: 'POA101', patch: { supplier: 'First' } }, { coalesce: true });
+  await a.engine.syncNow();
+  a.engine.dispatch('po.update', { poId: 'POA101', patch: { supplier: 'Second' } }, { coalesce: true });
+  a.engine.dispatch('product.update', { productId: 'P1', patch: { price: 31 } }, { coalesce: true });
+  a.engine.dispatch('product.update', { productId: 'P1', patch: { min: 5 } }, { coalesce: true });
+  a.engine.dispatch('product.update', { productId: 'P1', patch: { price: 32 } });
+  const pending = a.view().sync.pending;
+  await a.engine.syncNow();
+  const b = await secondDevice(server);
+
+  expect(pending).toBe(4);
+  expect(b.data().purchaseOrders[0].supplier).toBe('Second');
+  expect(b.data().products[0]).toMatchObject({ price: 32, min: 5 });
+});
+
+it('without an account, quick edits simply apply', async () => {
+  const server = makeServer();
+  const a = makeDevice(server);
+  await a.engine.start();
+
+  a.engine.dispatch('product.update', { productId: 'P1', patch: { price: 31 } }, { coalesce: true });
+  a.engine.dispatch('product.update', { productId: 'P1', patch: { price: 33 } }, { coalesce: true });
+
+  expect(a.data().products[0].price).toBe(33);
+  expect(a.view().sync.pending).toBe(0);
+});
+
 it('two devices selling offline converge to the right stock', async () => {
   const { server, a } = await shopWithOwner();
   const b = await secondDevice(server);

@@ -113,7 +113,9 @@ const op = (type, shape) => z.object({ id: Id, type: z.literal(type), at: Time, 
 
 const SCHEMAS = new Map([
   ['sale', op('sale', { bill: Bill })],
-  ['stock.move', op('stock.move', { lines: StockLines, reason: z.string().max(24).default(''), invoice: Invoice.optional() })],
+  // A supplier invoice made up only of new products has no stock lines of its own, but is still recorded.
+  ['stock.move', op('stock.move', { lines: z.array(StockLine).max(200), reason: z.string().max(24).default(''), invoice: Invoice.optional() })
+    .refine((o) => o.lines.length > 0 || o.invoice, { message: 'Nothing to move.', path: ['lines'] })],
   ['product.create', op('product.create', { product: Product })],
   ['product.update', op('product.update', { productId: Id, patch: ProductPatch })],
   ['product.delete', op('product.delete', { productId: Id })],

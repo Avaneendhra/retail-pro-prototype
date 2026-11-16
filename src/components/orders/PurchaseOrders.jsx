@@ -3,15 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
-import { useSettings } from '../../lib/settings';
 import { pname, fmtDate } from '../../lib/format';
 import Modal from '../common/Modal';
 
 export default function PurchaseOrders() {
   const { t } = useTranslation();
-  const { products, stats, purchaseOrders, createPO, updatePO, deletePO, receivePO, byId } = useInventory();
+  const { products, stats, purchaseOrders, shopName, createPO, updatePO, deletePO, receivePO, byId } = useInventory();
   const { showToast } = useToast();
-  const [settings] = useSettings();
   const [params] = useSearchParams();
   const [receiving, setReceiving] = useState(null);
   const [printing, setPrinting] = useState(null);
@@ -37,7 +35,7 @@ export default function PurchaseOrders() {
 
   const shareText = (po) => {
     const lines = po.items.map(i => `• ${byId(i.productId)?.name || i.productId} — ${i.qty}`).join('\n');
-    return `${t('orders.shareText', { no: po.id, shop: settings.shopName })}${po.supplier ? ` (${po.supplier})` : ''}\n\n${lines}`;
+    return `${t('orders.shareText', { no: po.id, shop: shopName })}${po.supplier ? ` (${po.supplier})` : ''}\n\n${lines}`;
   };
 
   const setItemQty = (po, productId, qty) => updatePO(po.id, { items: po.items.map(i => i.productId === productId ? { ...i, qty: Math.max(1, qty || 1) } : i) });
@@ -165,7 +163,7 @@ export default function PurchaseOrders() {
 
       {printPO && (
         <div className="print-area" aria-hidden="true">
-          <h2>{settings.shopName}</h2>
+          <h2>{shopName}</h2>
           <p>{printPO.id} · {fmtDate(printPO.createdAt)}</p>
           {printPO.supplier && <p>{t('orders.supplier')}: {printPO.supplier}</p>}
           <table><tbody>

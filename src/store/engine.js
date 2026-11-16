@@ -83,6 +83,8 @@ export function createEngine({
     ready,
     mode,
     data: view,
+    // The numbers the next bill, order and product made here will get, and this device's letter.
+    numbers: { code: deviceCode(mode === 'account' ? dataset.device.no : 0), bill: dataset.counters.bill, po: dataset.counters.po, sku: dataset.counters.sku },
     account: session && mode === 'account' ? { user: session.user, shop: session.shop, device: session.device } : null,
     storage: storage.kind,
     saveError,
@@ -162,10 +164,35 @@ export function createEngine({
     }, SYNC_DELAY_MS);
   }
 
-  /** Makes a change. It shows at once; with an account it is also queued for the server. */
-  function dispatch(type, payload = {}) {
-    const op = { id: makeId(), type, at: now(), ...payload };
-    if (mode === 'account') {
+  // Changes made in this session that have never been put in a request. Only these may
+  // still be altered: anything sent even once may already be recorded by the server.
+  const unsentEver = new Set();
+  const EDIT_TARGET = { 'product.update': 'productId', 'po.update': 'poId' };
+
+  /** Folds an edit into the edit just before it, when both change the same thing and none was sent. */
+  function mergeIntoLast(type, payload) {
+    const last = dataset.outbox[dataset.outbox.length - 1];
+    const key = EDIT_TARGET[type];
+    if (!key || !last || last.type !== type || last[key] !== payload[key] || !unsentEver.has(last.id)) return null;
+    const merged = { ...last, patch: { ...last.patch, ...payload.patch }, at: now() };
+    unsentEver.delete(last.id);
+    unsentEver.add(merged.id);
+    dataset = { ...dataset, outbox: [...dataset.outbox.slice(0, -1), merged] };
+    return merged;
+  }
+
+  /**
+   * Makes a change. It shows at once; with an account it is also queued for the server.
+   * `coalesce` lets rapid edits of one thing (typing a supplier name) travel as a single change.
+   */
+  function dispatch(type, payload = {}, { coalesce = false } = {}) {
+    const merged = coalesce && mode === 'account' ? mergeIntoLast(type, payload) : null;
+    const op = merged ?? { id: makeId(), type, at: now(), ...payload };
+    if (merged) {
+      view = applyOp(view, { ...merged, patch: payload.patch });
+      scheduleSync();
+    } else if (mode === 'account') {
+      unsentEver.add(op.id);
       dataset = { ...dataset, outbox: [...dataset.outbox, op] };
       view = applyOp(view, op);
       scheduleSync();
@@ -203,6 +230,7 @@ export function createEngine({
       batch.push(op);
       bytes += size;
     }
+    for (const op of batch) unsentEver.delete(op.id);
     return batch;
   }
 

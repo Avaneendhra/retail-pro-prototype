@@ -146,7 +146,7 @@ export default function AddStock() {
   const commit = useCallback((draft, qty = 1) => {
     let changes;
     if (draft.productId) {
-      changes = receiveStock([{ productId: draft.productId, qty }]);
+      changes = receiveStock([{ productId: draft.productId, qty }], { reason: 'scan' });
     } else {
       const needsReview = draft.placeholder || !(Number(draft.price) > 0);
       changes = receiveStock([{
@@ -155,7 +155,7 @@ export default function AddStock() {
           price: Number(draft.price) || 0, category: draft.category, min: Number(draft.min) || 5, needsReview,
         },
         qty,
-      }]);
+      }], { reason: 'scan' });
     }
     const ch = changes[0];
     if (!ch) return null;
@@ -296,7 +296,7 @@ export default function AddStock() {
   };
   const plusOne = () => {
     if (!flash) return;
-    const ch = receiveStock([{ productId: flash.productId, qty: 1 }]);
+    const ch = receiveStock([{ productId: flash.productId, qty: 1 }], { reason: 'scan' });
     const next = { ...flash, qty: flash.qty + 1, after: ch[0]?.after ?? flash.after, changes: [...flash.changes, ...ch.map(c => ({ ...c, isNew: false }))] };
     setRecent(r => r.map(x => (x === flash ? next : x)));
     setFlash(next);

@@ -7,9 +7,6 @@ import { pname, fmtDate } from '../../lib/format';
 import { parseInvoiceText, makeMatcher, downscale, sampleInvoiceImage } from '../../lib/invoiceParser';
 import Modal from '../common/Modal';
 
-const HISTORY_KEY = 'sr2_invoices';
-const loadHistory = () => { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; } };
-
 const readFile = (file) => new Promise((resolve, reject) => {
   const r = new FileReader();
   r.onload = () => resolve(r.result);
@@ -67,7 +64,7 @@ function CameraModal({ open, onClose, onCapture }) {
 
 export default function SupplierInvoice() {
   const { t } = useTranslation();
-  const { products, receiveStock } = useInventory();
+  const { products, invoices, receiveStock } = useInventory();
   const { showToast } = useToast();
   const [settings] = useSettings();
   const useClaude = !!settings.apiKey;
@@ -81,7 +78,7 @@ export default function SupplierInvoice() {
   const [changes, setChanges] = useState([]);
   const [drag, setDrag] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [history, setHistory] = useState(loadHistory);
+  const history = invoices.slice(0, 10);
   const fileRef = useRef(null);
 
   const match = useMemo(() => makeMatcher(products), [products]);
@@ -150,12 +147,9 @@ export default function SupplierInvoice() {
     const items = activeRows.map(r => r.target === 'new'
       ? { newProduct: { name: r.name.trim(), price: Number(r.newPrice) || 0, category: 'other' }, qty: Number(r.qty) }
       : { productId: r.target, qty: Number(r.qty) });
-    const ch = receiveStock(items);
+    // The invoice itself is recorded with the stock it brought, so it shows on every device.
+    const ch = receiveStock(items, { reason: 'invoice', invoice: { supplier: header.supplier, invoiceNo: header.invoiceNo, dateText: header.date } });
     setChanges(ch);
-    const entry = { ...header, count: ch.length, units: ch.reduce((s, c) => s + c.qty, 0), at: Date.now() };
-    const next = [entry, ...history].slice(0, 10);
-    setHistory(next);
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
     setStep('done');
   };
 
@@ -196,8 +190,8 @@ export default function SupplierInvoice() {
             <section className="card p-6 mt-6">
               <h2 className="eyebrow mb-4">{t('invoice.history')}</h2>
               <div className="divide-y divide-[var(--border)]">
-                {history.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between gap-4 py-3 text-sm">
+                {history.map((h) => (
+                  <div key={h.id} className="flex items-center justify-between gap-4 py-3 text-sm">
                     <span className="font-medium flex-1 truncate">{h.supplier || '—'}</span>
                     <span className="font-mono text-[var(--text-secondary)]">{h.invoiceNo || '—'}</span>
                     <span className="text-[var(--text-muted)] w-28 text-right">{fmtDate(h.at)}</span>

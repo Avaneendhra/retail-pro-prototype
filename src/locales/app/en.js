@@ -145,6 +145,17 @@ export default {
     shop: 'Shop name', dataTitle: 'Demo data', reset: 'Reset demo data', resetConfirm: 'Reset all products, sales and orders to the demo data?', resetDone: 'Demo data restored',
   },
 
+  app: {
+    loading: 'Opening your shop…',
+    alreadyOpenTitle: 'stokd is already open',
+    alreadyOpenBody: 'It is open in another tab or window on this device. Use that one, or close it and try again here.',
+    tryAgain: 'Try again',
+    startErrorTitle: 'The shop data could not be opened',
+    startErrorBody: 'Close other tabs of this app and try again. Nothing has been changed or deleted.',
+    notSaving: 'This browser is not saving data. Anything you enter will be gone when this page closes. Leave private browsing or free up space, then reload.',
+    saveFailed: 'The last changes could not be saved on this device. Free up some storage space. The app keeps trying.',
+  },
+
   toast: {
     lowStock: 'Low stock: {{name}} has {{qty}} left (minimum {{min}})',
     outOfStock: '{{name}} is now out of stock',

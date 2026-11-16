@@ -6,6 +6,7 @@ import { useInventory } from '../../context/InventoryContext';
 import { LANGUAGES } from '../../i18n';
 import { pname } from '../../lib/format';
 import SettingsModal from './SettingsModal';
+import StorageNotice from './StorageNotice';
 import Logo from './Logo';
 
 const I = {
@@ -137,6 +138,7 @@ export default function AppShell() {
       </header>
 
       <main className="main-content">
+        <StorageNotice />
         <div className="animate-in" key={pathname}>
           <Outlet />
         </div>
