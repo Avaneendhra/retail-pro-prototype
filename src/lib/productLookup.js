@@ -47,37 +47,55 @@ const DBS = [
 
 const tidy = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 
-/** Look a barcode up in the Open Food / Beauty / Products Facts databases. */
-export async function lookupBarcode(code, { timeoutMs = 6000 } = {}) {
-  const fields = 'product_name,product_name_en,generic_name,brands,quantity,categories_tags,categories,image_front_small_url,image_url';
-  for (const db of DBS) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const res = await fetch(`${db.host}/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`, { signal: ctrl.signal });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const p = data?.product;
-      if (data?.status !== 1 || !p) continue;
-      const baseName = tidy(p.product_name_en || p.product_name || p.generic_name);
-      if (!baseName) continue;
-      const brand = tidy((p.brands || '').split(',')[0]);
-      const size = tidy(p.quantity);
-      const categoryText = [(p.categories_tags || []).join(' '), p.categories || ''].join(' ');
-      return {
-        source: db.name,
-        name: composeName(brand, baseName, size),
-        brand, size,
-        category: db.name === 'Open Beauty Facts' ? 'personal' : guessCategory(categoryText, baseName),
-        image: p.image_front_small_url || p.image_url || '',
-      };
-    } catch {
-      /* network error / timeout: try the next database */
-    } finally {
-      clearTimeout(timer);
-    }
+async function getJson(url, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null; // network error or timeout
+  } finally {
+    clearTimeout(timer);
   }
-  return null;
+}
+
+const FIELDS = 'product_name,product_name_en,generic_name,brands,quantity,categories_tags,categories,image_front_small_url,image_url';
+
+function readProduct(db, data) {
+  const p = data?.product;
+  if (data?.status !== 1 || !p) return null;
+  const baseName = tidy(p.product_name_en || p.product_name || p.generic_name);
+  if (!baseName) return null;
+  const brand = tidy((p.brands || '').split(',')[0]);
+  const size = tidy(p.quantity);
+  const categoryText = [(p.categories_tags || []).join(' '), p.categories || ''].join(' ');
+  return {
+    source: db.name,
+    name: composeName(brand, baseName, size),
+    brand, size,
+    category: db.name === 'Open Beauty Facts' ? 'personal' : guessCategory(categoryText, baseName),
+    image: p.image_front_small_url || p.image_url || '',
+  };
+}
+
+/** Look a barcode up in the Open Food / Beauty / Products Facts databases, all at once. */
+export async function lookupBarcode(code, { timeoutMs = 6000 } = {}) {
+  const found = await Promise.all(DBS.map(async (db) =>
+    readProduct(db, await getJson(`${db.host}/api/v2/product/${encodeURIComponent(code)}.json?fields=${FIELDS}`, timeoutMs))));
+  return found.find(Boolean) || null;
+}
+
+/**
+ * The price shoppers in India last reported for this barcode on Open Prices
+ * (free, from the Open Food Facts project). The price before any discount is
+ * taken, since that is closest to the MRP.
+ */
+export async function lookupPrice(code, { timeoutMs = 6000 } = {}) {
+  const data = await getJson(`https://prices.openfoodfacts.org/api/v1/prices?product_code=${encodeURIComponent(code)}&currency=INR&order_by=-date&size=10`, timeoutMs);
+  const latest = (data?.items || []).find((item) => (item.currency || 'INR') === 'INR' && Number(item.price_without_discount || item.price) > 0);
+  if (!latest) return null;
+  return { price: Number(latest.price_without_discount || latest.price), source: 'Open Prices', date: latest.date || '' };
 }
 
 /** "Amul" + "Butter" + "100 g" -> "Amul Butter 100g" without repeating parts. */

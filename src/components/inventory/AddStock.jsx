@@ -7,7 +7,7 @@ import { useSettings } from '../../lib/settings';
 import { inr, pname } from '../../lib/format';
 import { CATEGORIES } from '../../data/seed';
 import { downscale } from '../../lib/invoiceParser';
-import { lookupBarcode, parseLabel, guessCategory, frameFromVideo, strictMatch } from '../../lib/productLookup';
+import { lookupBarcode, lookupPrice, parseLabel, guessCategory, frameFromVideo, strictMatch } from '../../lib/productLookup';
 import { identifyProduct } from '../../lib/identifyProduct';
 import { parseBarcode } from '../../lib/barcodeData';
 import { expiryInfo, readDateInput, dateInputText } from '../../lib/expiry';
@@ -52,7 +52,7 @@ function PackField({ id, label, source, value, placeholder, onChange }) {
 
 export default function AddStock() {
   const { t } = useTranslation();
-  const { products, findByBarcode, byId, receiveStock, revertStock } = useInventory();
+  const { products, findByBarcode, byId, receiveStock, revertStock, updateProduct } = useInventory();
   const { showToast } = useToast();
   const [settings] = useSettings();
   const useClaude = !!settings.apiKey;
@@ -79,6 +79,9 @@ export default function AddStock() {
   const cameraOnAtRef = useRef(0);
   const productsRef = useRef(products); productsRef.current = products;
   const fileRef = useRef(null);
+  const priceRef = useRef(null);
+  const [priceError, setPriceError] = useState(false);
+  const [readingPrice, setReadingPrice] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(AUTO_KEY, auto ? 'on' : 'off'); } catch { /* ignore */ } }, [auto]);
 
@@ -127,6 +130,7 @@ export default function AddStock() {
     return identifyProduct({ barcode, format, dataUrl, quiet }, {
       decodeImage: async (url) => { try { return await scanImage(await loadImage(url)); } catch { return null; } },
       lookup: (code) => { if (!quiet) setStage('stageLookup'); return lookupBarcode(code); },
+      lookupPrice: (code) => lookupPrice(code),
       readLabel: (url, opts) => { if (!quiet) setStage('stageLabel'); return readLabel(url, opts); },
       findByBarcode, byId,
       matchByName: (name, size) => strictMatch(productsRef.current, name, size),
@@ -137,6 +141,7 @@ export default function AddStock() {
   const commit = useCallback((draft, qty = 1) => {
     let changes;
     if (draft.productId) {
+      if (Number(draft.price) > 0 && !(byId(draft.productId)?.price > 0)) updateProduct(draft.productId, { price: Number(draft.price), needsReview: false });
       changes = receiveStock([{ productId: draft.productId, qty, details: packOf(draft) }], { reason: 'scan' });
     } else {
       const needsReview = draft.placeholder || !(Number(draft.price) > 0);
@@ -158,7 +163,7 @@ export default function AddStock() {
     };
     setRecent(r => [entry, ...r].slice(0, 15));
     return entry;
-  }, [receiveStock, byId]);
+  }, [receiveStock, byId, updateProduct]);
 
   /* ── One pass of the automatic pipeline ── */
   const handle = useCallback(async (input) => {
@@ -179,7 +184,9 @@ export default function AddStock() {
       // Same product still in front of the camera: don't count it twice
       if (input.quiet && lastAddedRef.current.key === key && seenGap < SAME_ITEM_GAP_MS) return;
 
-      if (autoRef.current) {
+      // Full details are required: a product with no price (or no name) stops for the shopkeeper.
+      const incomplete = draft.needsPrice || draft.placeholder;
+      if (autoRef.current && !incomplete) {
         const entry = commit(draft, 1);
         if (entry) {
           lastAddedRef.current = { key: entry.productId, at: now };
@@ -188,7 +195,10 @@ export default function AddStock() {
           if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
         }
       } else {
-        setResult({ ...draft, qty: 1, min: 5, code: '', ...inputsOf(draft) });
+        if (draft.placeholder) draft.name = '';
+        setPriceError(false);
+        setResult({ ...draft, price: draft.price || '', qty: 1, min: 5, code: '', ...inputsOf(draft) });
+        if (navigator.vibrate) navigator.vibrate(60);
       }
     } finally {
       setStage(null);
@@ -299,11 +309,42 @@ export default function AddStock() {
   };
 
   /* Manual review mode */
-  const discard = () => { setResult(null); resume(); };
+  const discard = () => { setResult(null); setPriceError(false); resume(); };
+
+  /** Reads the MRP (and dates) from whatever side of the pack is in front of the camera now. */
+  const readPriceFromCamera = async () => {
+    const frame = frameFromVideo(videoRef.current, 1600);
+    if (!frame || readingPrice) return;
+    setReadingPrice(true);
+    try {
+      const label = await readLabel(frame, { quiet: false });
+      setResult((r) => {
+        if (!r) return r;
+        const patch = {};
+        const fs = { ...r.fieldSources };
+        if (label?.mrp > 0) { patch.price = String(label.mrp); patch.mrpFromLabel = true; delete fs.price; }
+        if (label?.mfgDate && !r.mfgText) { patch.mfgText = dateInputText(label.mfgDate); fs.mfgDate = 'label'; }
+        if (label?.expiryDate && !r.expiryText) { patch.expiryText = dateInputText(label.expiryDate); fs.expiryDate = 'label'; }
+        if (label?.batch && !r.batch) { patch.batch = label.batch; fs.batch = 'label'; }
+        if (!r.productId && !r.name && label?.name) patch.name = label.name;
+        return { ...r, ...patch, fieldSources: fs };
+      });
+      if (label?.mrp > 0) setPriceError(false);
+      else showToast(t('addStock.priceNotRead'), 'error');
+    } finally {
+      setReadingPrice(false);
+    }
+  };
   const saveReview = () => {
     if (!result) return;
     const qty = Math.max(1, parseInt(result.qty, 10) || 1);
     if (!result.productId && !result.name.trim()) { showToast(t('addStock.errName'), 'error'); return; }
+    if ((!result.productId || result.needsPrice) && !(Number(result.price) > 0)) {
+      setPriceError(true);
+      priceRef.current?.focus();
+      showToast(t('addStock.errPrice'), 'error');
+      return;
+    }
     const mfgDate = readDateInput(result.mfgText);
     const expiryDate = readDateInput(result.expiryText);
     if (mfgDate === null || expiryDate === null) { showToast(t('addStock.errDate'), 'error'); return; }
@@ -314,9 +355,30 @@ export default function AddStock() {
   };
   const set = (patch) => setResult(r => ({ ...r, ...patch }));
   const manual = () => {
+    setPriceError(false);
     setResult({ name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [], fieldSources: {}, batch: '', mfgText: '', expiryText: '' });
   };
   const reviewProduct = result?.productId ? byId(result.productId) : null;
+  const priceSource = result?.fieldSources?.price;
+  const priceField = result && (
+    <div className="col-span-2 sm:col-span-1">
+      <label className="field-label" htmlFor="as-price">{t('addStock.price')} *</label>
+      <input id="as-price" ref={priceRef} className="form-input font-mono" inputMode="decimal" required aria-required="true"
+        aria-invalid={priceError || undefined} aria-describedby="as-price-hint" style={priceError ? { borderColor: 'var(--danger)' } : undefined}
+        value={result.price || ''} onChange={e => { setPriceError(false); set({ price: e.target.value.replace(/[^\d.]/g, ''), mrpFromLabel: false, fieldSources: { ...result.fieldSources, price: undefined } }); }} />
+      <p id="as-price-hint" className={`text-[11px] mt-1 ${priceError ? 'text-[var(--danger)]' : priceSource || result.mrpFromLabel ? 'text-[var(--success)]' : 'text-[var(--text-muted)]'}`}>
+        {priceSource === 'barcode' ? t('addStock.fromBarcode')
+          : priceSource === 'prices' ? t('addStock.fromPrices')
+            : result.mrpFromLabel ? t('addStock.mrpHint')
+              : !(Number(result.price) > 0) ? t('addStock.priceRequired') : ''}
+      </p>
+      {live && !(priceSource === 'barcode') && (
+        <button type="button" className="text-xs font-semibold text-[var(--primary)] mt-1.5" onClick={readPriceFromCamera} disabled={readingPrice}>
+          {readingPrice ? t('addStock.stageLabel') : t('addStock.readPrice')}
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -425,18 +487,15 @@ export default function AddStock() {
                   )}
                 </div>
               </div>
+              {result.needsPrice && <p className="text-sm text-[var(--warning)] mb-4" role="status">{t('addStock.needsPriceNote')}</p>}
+              {reviewProduct && result.needsPrice && <div className="grid grid-cols-2 gap-4 mb-5">{priceField}</div>}
               {!reviewProduct && (
                 <div className="grid grid-cols-2 gap-4 mb-5">
                   <div className="col-span-2">
                     <label className="field-label" htmlFor="as-name">{t('addStock.name')}</label>
                     <input id="as-name" className="form-input" value={result.name} onChange={e => set({ name: e.target.value, placeholder: false })} />
                   </div>
-                  <div>
-                    <label className="field-label" htmlFor="as-price">{t('addStock.price')}</label>
-                    <input id="as-price" className="form-input font-mono" inputMode="decimal" value={result.price || ''} onChange={e => set({ price: e.target.value.replace(/[^\d.]/g, ''), mrpFromLabel: false })} />
-                    {result.fieldSources?.price === 'barcode' ? <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.fromBarcode')}</p>
-                      : result.mrpFromLabel && <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.mrpHint')}</p>}
-                  </div>
+                  {priceField}
                   <div>
                     <label className="field-label" htmlFor="as-cat">{t('common.category')}</label>
                     <select id="as-cat" className="form-input" value={result.category} onChange={e => set({ category: e.target.value })}>
