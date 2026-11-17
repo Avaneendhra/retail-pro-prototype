@@ -6,6 +6,8 @@
 //   3. Free product databases, by barcode: name, brand, category, picture.
 //   4. The label, only for what is still missing (MRP, dates, batch, or the
 //      name when no database knows the barcode).
+//   5. A price shoppers reported online (Open Prices), when no MRP was read.
+// The price is required: needsPrice says the shopkeeper still has to type it.
 import { parseBarcode } from './barcodeData.js';
 
 const DETAIL_FIELDS = ['price', 'mfgDate', 'expiryDate', 'batch'];
@@ -19,9 +21,9 @@ export function looksLikeProduct(label) {
 
 /**
  * input: { barcode?, format?, dataUrl?, quiet? }
- * deps:  { decodeImage(dataUrl), lookup(code), readLabel(dataUrl, { quiet }), findByBarcode(code), byId(id), matchByName(name, size) }
+ * deps:  { decodeImage(dataUrl), lookup(code), lookupPrice?(code), readLabel(dataUrl, { quiet }), findByBarcode(code), byId(id), matchByName(name, size) }
  * Returns null, or a draft: { productId?, barcode, name, category, price, batch, mfgDate, expiryDate,
- *   image, placeholder, sources, fieldSources }. fieldSources says where each value came from.
+ *   image, placeholder, needsPrice, sources, fieldSources }. fieldSources says where each value came from.
  */
 export async function identifyProduct({ barcode = '', format = '', dataUrl = null, quiet = false }, deps) {
   const fieldSources = {};
@@ -50,9 +52,11 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
   // 3 and 4. Databases and the label, the label only when something is still missing.
   const missing = () => !draft.price || !draft.mfgDate || !draft.expiryDate;
   const readLabel = () => (dataUrl ? deps.readLabel(dataUrl, { quiet }) : Promise.resolve(null));
-  let [db, label] = await Promise.all([
+  const priceOnline = (c) => (deps.lookupPrice ? deps.lookupPrice(c) : null);
+  let [db, label, online] = await Promise.all([
     code && !known ? deps.lookup(code.code) : null,
     !code || missing() ? readLabel() : null,
+    code && !draft.price && !(known?.price > 0) ? priceOnline(code.code) : null,
   ]);
   if (!known && !db?.name && !label && dataUrl) label = await readLabel();
 
@@ -60,7 +64,7 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
     const fromLabel = parseBarcode(label.barcode);
     take('barcode', fromLabel.code, 'label');
     known = deps.findByBarcode(fromLabel.code);
-    if (!known && !db) db = await deps.lookup(fromLabel.code);
+    if (!known && !db) [db, online] = await Promise.all([deps.lookup(fromLabel.code), label.mrp > 0 ? null : priceOnline(fromLabel.code)]);
   }
   if (!known && !draft.barcode && label?.matchedId) known = deps.byId(label.matchedId);
   if (!known && !draft.barcode && !db && label?.name) known = deps.matchByName(label.name, label.size);
@@ -68,13 +72,16 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
   const labelSource = label?.engine === 'claude' ? 'claude' : 'label';
   for (const field of ['mfgDate', 'expiryDate', 'batch']) take(field, label?.[field], labelSource);
   take('price', label?.mrp, labelSource);
+  take('price', online?.price, 'prices');
 
   const sources = [];
   if (fieldSources.barcode === 'barcode') sources.push('barcode');
+  if (fieldSources.price === 'prices') sources.push('prices');
 
   if (known) {
     if (!fieldSources.barcode) take('barcode', known.barcode, 'catalog');
-    return { ...draft, productId: known.id, name: known.name, sources: [...sources, 'catalog'], fieldSources: { ...fieldSources, name: 'catalog' } };
+    const needsPrice = !(known.price > 0) && !(draft.price > 0);
+    return { ...draft, productId: known.id, name: known.name, needsPrice, sources: [...sources, 'catalog'], fieldSources: { ...fieldSources, name: 'catalog' } };
   }
 
   // In the automatic loop a frame without a barcode must clearly show a product.
@@ -88,5 +95,5 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
 
   if (db) sources.push('database');
   if (Object.values(fieldSources).includes(labelSource)) sources.push(labelSource);
-  return { ...draft, placeholder: !draft.name, mrpFromLabel: fieldSources.price === labelSource, sources, fieldSources };
+  return { ...draft, placeholder: !draft.name, needsPrice: !(draft.price > 0), mrpFromLabel: fieldSources.price === labelSource, sources, fieldSources };
 }

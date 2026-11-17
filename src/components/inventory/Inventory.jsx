@@ -87,6 +87,7 @@ function EditModal({ product, onClose }) {
   }));
   const langLabel = LANGUAGES.find(l => l.code === lang)?.native;
   const save = () => {
+    if (!(Number(f.price) > 0)) { showToast(t('addStock.errPrice'), 'error'); return; }
     updateProduct(product.id, {
       name: f.name.trim() || product.name, code: f.code.trim().toUpperCase() || product.code, category: f.category,
       price: Number(f.price) || 0, min: Number(f.min) || 0, quantity: Math.max(0, Number(f.quantity) || 0), needsReview: false,

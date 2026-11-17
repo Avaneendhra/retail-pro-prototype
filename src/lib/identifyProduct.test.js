@@ -98,3 +98,46 @@ it('a shop\'s own Code 128 label still counts as a barcode', async () => {
 
   expect(draft).toMatchObject({ barcode: 'SKU-00412', placeholder: true });
 });
+
+it('when neither the barcode nor the label gives a price, the price is looked up online', async () => {
+  const d = deps({
+    lookup: vi.fn(async () => ({ name: 'Chupa Chups Lollipop', category: 'snacks' })),
+    lookupPrice: vi.fn(async () => ({ price: 10, source: 'Open Prices' })),
+  });
+
+  const draft = await identifyProduct({ barcode: '8901393024661', format: 'EAN13' }, d);
+
+  expect(d.lookupPrice).toHaveBeenCalledWith('8901393024661');
+  expect(draft).toMatchObject({ price: 10, needsPrice: false });
+  expect(draft.fieldSources.price).toBe('prices');
+  expect(draft.sources).toContain('prices');
+});
+
+it('the MRP printed on the label wins over a price found online', async () => {
+  const d = deps({
+    lookup: vi.fn(async () => ({ name: 'Britannia Bread 400g', category: 'bakery' })),
+    readLabel: vi.fn(async () => ({ name: 'Bread', mrp: 40 })),
+    lookupPrice: vi.fn(async () => ({ price: 38, source: 'Open Prices' })),
+  });
+
+  const draft = await identifyProduct({ barcode: '8901725121228', format: 'EAN13', dataUrl: FRAME }, d);
+
+  expect(draft.price).toBe(40);
+  expect(draft.fieldSources.price).toBe('label');
+});
+
+it('a new product with no price found anywhere is marked as needing a price', async () => {
+  const draft = await identifyProduct({ barcode: '8906001200099', format: 'EAN13' }, deps({ lookupPrice: vi.fn(async () => null) }));
+
+  expect(draft).toMatchObject({ price: 0, needsPrice: true });
+});
+
+it('a product in stock that has no price yet also needs one', async () => {
+  const FREE = { id: 'P2', name: 'Loose Rice', barcode: '8906010400019', price: 0 };
+  const d = deps({ findByBarcode: (code) => (code === FREE.barcode ? FREE : null), byId: () => FREE });
+
+  const draft = await identifyProduct({ barcode: FREE.barcode, format: 'EAN13' }, d);
+
+  expect(draft).toMatchObject({ productId: 'P2', needsPrice: true });
+  expect(await identifyProduct({ barcode: MILK.barcode, format: 'EAN13' }, deps())).toMatchObject({ productId: 'P1', needsPrice: false });
+});
