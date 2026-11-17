@@ -23,7 +23,13 @@ export default defineConfig(({ mode }) => {
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        navigateFallbackDenylist: [/^\/api\//]
+        navigateFallbackDenylist: [/^\/api\//],
+        // the product list (about 2 MB) is kept after the first download, refreshed in the background
+        runtimeCaching: [{
+          urlPattern: /\/catalog\/products\.json$/,
+          handler: 'StaleWhileRevalidate',
+          options: { cacheName: 'product-list', expiration: { maxEntries: 2 } },
+        }],
       },
       manifest: {
         id: base,

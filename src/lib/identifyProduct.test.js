@@ -141,3 +141,41 @@ it('a product in stock that has no price yet also needs one', async () => {
   expect(draft).toMatchObject({ productId: 'P2', needsPrice: true });
   expect(await identifyProduct({ barcode: MILK.barcode, format: 'EAN13' }, deps())).toMatchObject({ productId: 'P1', needsPrice: false });
 });
+
+const LISTED = { barcode: '8904352005008', name: 'BIOTIQUE Body Oil - Carrot Seed, 120 ml', brand: 'BIOTIQUE', size: '', price: 136, category: 'personal', subCategory: 'bath & hand wash', image: 'oil.jpg', source: 'Product list' };
+
+it('a barcode in the product list gives its name, price and details, without asking online', async () => {
+  const d = deps({
+    findListed: vi.fn(async (code) => (code === LISTED.barcode ? LISTED : null)),
+    lookupPrice: vi.fn(async () => ({ price: 99 })),
+  });
+
+  const draft = await identifyProduct({ barcode: LISTED.barcode, format: 'EAN13' }, d);
+
+  expect(draft).toMatchObject({ barcode: LISTED.barcode, name: LISTED.name, price: 136, category: 'personal', image: 'oil.jpg', needsPrice: false, placeholder: false });
+  expect(draft.fieldSources).toMatchObject({ name: 'list', price: 'list', category: 'list' });
+  expect(draft.sources).toEqual(['barcode', 'list']);
+  expect(draft.confirm).toBeFalsy();
+  expect(d.lookup).not.toHaveBeenCalled();
+  expect(d.lookupPrice).not.toHaveBeenCalled();
+});
+
+it('your own products still come before the product list', async () => {
+  const d = deps({ findListed: vi.fn(async () => ({ ...LISTED, barcode: MILK.barcode })) });
+
+  expect(await identifyProduct({ barcode: MILK.barcode, format: 'EAN13' }, d)).toMatchObject({ productId: 'P1' });
+  expect(d.findListed).not.toHaveBeenCalled();
+});
+
+it('a product without a barcode is found in the list by the name on its label, and is shown for checking', async () => {
+  const d = deps({
+    readLabel: vi.fn(async () => ({ name: 'Haldiram Aloo Bhujia', size: '200g', mrp: 0 })),
+    findListedByName: vi.fn(async () => ({ ...LISTED, barcode: '', name: 'Haldiram Aloo Bhujia Namkeen, 200 g', price: 67, category: 'snacks' })),
+  });
+
+  const draft = await identifyProduct({ dataUrl: FRAME, quiet: true }, d);
+
+  expect(d.findListedByName).toHaveBeenCalledWith('Haldiram Aloo Bhujia', '200g');
+  expect(draft).toMatchObject({ name: 'Haldiram Aloo Bhujia Namkeen, 200 g', price: 67, category: 'snacks', confirm: true, needsPrice: false });
+  expect(draft.fieldSources.price).toBe('list');
+});

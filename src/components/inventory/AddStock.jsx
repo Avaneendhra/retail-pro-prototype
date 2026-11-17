@@ -9,6 +9,7 @@ import { CATEGORIES } from '../../data/seed';
 import { downscale } from '../../lib/invoiceParser';
 import { lookupBarcode, lookupPrice, parseLabel, guessCategory, frameFromVideo, strictMatch } from '../../lib/productLookup';
 import { identifyProduct } from '../../lib/identifyProduct';
+import { loadProductList } from '../../lib/productList';
 import { parseBarcode } from '../../lib/barcodeData';
 import { expiryInfo, readDateInput, dateInputText } from '../../lib/expiry';
 import { openCamera, closeCamera, setTorch, scanVideoFrame, scanImage, loadImage, ocrLabel, warmUpBarcodeEngine } from '../../lib/scanEngine';
@@ -96,6 +97,7 @@ export default function AddStock() {
 
   useEffect(() => {
     warmUpBarcodeEngine();
+    loadProductList(); // start downloading the product list before the first scan
     return () => {
       workerRef.current?.terminate?.();
       closeCamera(camRef.current?.stream);
@@ -131,6 +133,8 @@ export default function AddStock() {
       decodeImage: async (url) => { try { return await scanImage(await loadImage(url)); } catch { return null; } },
       lookup: (code) => { if (!quiet) setStage('stageLookup'); return lookupBarcode(code); },
       lookupPrice: (code) => lookupPrice(code),
+      findListed: async (code) => (await loadProductList())?.findByBarcode(code) || null,
+      findListedByName: async (name, size) => (await loadProductList())?.findByName(name, size) || null,
       readLabel: (url, opts) => { if (!quiet) setStage('stageLabel'); return readLabel(url, opts); },
       findByBarcode, byId,
       matchByName: (name, size) => strictMatch(productsRef.current, name, size),
@@ -185,7 +189,8 @@ export default function AddStock() {
       if (input.quiet && lastAddedRef.current.key === key && seenGap < SAME_ITEM_GAP_MS) return;
 
       // Full details are required: a product with no price (or no name) stops for the shopkeeper.
-      const incomplete = draft.needsPrice || draft.placeholder;
+      // A product matched only by the name on its label is shown for a quick check first.
+      const incomplete = draft.needsPrice || draft.placeholder || draft.confirm;
       if (autoRef.current && !incomplete) {
         const entry = commit(draft, 1);
         if (entry) {
@@ -369,6 +374,7 @@ export default function AddStock() {
       <p id="as-price-hint" className={`text-[11px] mt-1 ${priceError ? 'text-[var(--danger)]' : priceSource || result.mrpFromLabel ? 'text-[var(--success)]' : 'text-[var(--text-muted)]'}`}>
         {priceSource === 'barcode' ? t('addStock.fromBarcode')
           : priceSource === 'prices' ? t('addStock.fromPrices')
+          : priceSource === 'list' ? t('addStock.fromList')
             : result.mrpFromLabel ? t('addStock.mrpHint')
               : !(Number(result.price) > 0) ? t('addStock.priceRequired') : ''}
       </p>
@@ -488,6 +494,7 @@ export default function AddStock() {
                 </div>
               </div>
               {result.needsPrice && <p className="text-sm text-[var(--warning)] mb-4" role="status">{t('addStock.needsPriceNote')}</p>}
+              {result.confirm && <p className="text-sm text-[var(--text-secondary)] mb-4" role="status">{t('addStock.confirmNote')}</p>}
               {reviewProduct && result.needsPrice && <div className="grid grid-cols-2 gap-4 mb-5">{priceField}</div>}
               {!reviewProduct && (
                 <div className="grid grid-cols-2 gap-4 mb-5">
