@@ -126,13 +126,13 @@ export default {
     engineClaude: 'Label reading: Claude', engineOcr: 'Label reading: on this device',
     empty: 'Scan a product to see its details here.',
     reviewTitle: 'Check the details', existingTitle: 'Already in your inventory', newProduct: 'New product',
-    sources: { barcode: 'Barcode', database: 'Product database', label: 'Label', claude: 'Claude', catalog: 'Your inventory', prices: 'Online prices' },
+    sources: { barcode: 'Barcode', database: 'Product database', label: 'Label', claude: 'Claude', catalog: 'Your inventory', prices: 'Online prices', list: 'Product list' },
     name: 'Product name', price: 'Selling price (₹)', mrpHint: 'MRP read from the label', barcodeField: 'Barcode', code: 'Short code', min: 'Minimum stock', quantity: 'Quantity',
     add: 'Add to inventory', addQty: 'Add {{qty}} to stock', discard: 'Discard', mrpDiffers: 'Label shows MRP {{mrp}}. Update the price in Inventory if it changed.',
     notFound: 'Not in the product database. Details were read from the label, please check them.', noDetails: 'Could not read details. Please fill them in.',
     recent: 'Added this session', newBadge: 'New', stockBadge: '+Stock',
     toastAdded: 'Added {{name}} to inventory', toastStock: '+{{qty}} {{name}} added to stock',
-    errCamera: 'Camera access denied. Please allow camera permission.', errRead: 'Could not read this product. Try better light or enter details by hand.', errName: 'Name is required', errPrice: 'Enter a selling price', fromPrices: 'Price shoppers reported online. Check it against the pack.', priceRequired: 'Required. Type it in, or show the MRP side to the camera.', readPrice: 'Read MRP with camera', needsPriceNote: 'No price found for this product yet. Enter the selling price to add it.', priceNotRead: 'No MRP found on that side. Type the price in.',
+    errCamera: 'Camera access denied. Please allow camera permission.', errRead: 'Could not read this product. Try better light or enter details by hand.', errName: 'Name is required', errPrice: 'Enter a selling price', fromPrices: 'Price shoppers reported online. Check it against the pack.', fromList: 'MRP from the product list', confirmNote: 'Found in the product list by the name on the label. Check it is the same product and size.', priceRequired: 'Required. Type it in, or show the MRP side to the camera.', readPrice: 'Read MRP with camera', needsPriceNote: 'No price found for this product yet. Enter the selling price to add it.', priceNotRead: 'No MRP found on that side. Type the price in.',
   },
 
   install: {
