@@ -62,3 +62,56 @@ it('a single packet is never matched to a multipack, whose price is for several'
   expect(list.findByName('Dettol Original Soap', '125g')).toBe(null);
   expect(list.findByName('Dettol Original Soap 4x125g multi pack', '125g')?.price).toBe(184);
 });
+
+const BRANDS = {
+  ...DATA,
+  rows: [
+    ['8904004403770', 'Haldiram\'s Namkeen - Moong Dal, 1 kg Pouch', 'Haldiram\'s', '', 260, 'snacks', 1, ''],
+    ['8904004400601', 'Haldiram\'s Aloo Bhujia, 400 g', 'Haldiram\'s', '', 110, 'snacks', 1, ''],
+    ['', 'Haldiram  Moong Dal Namkeen, 200 g', 'Haldiram', '', 67, 'snacks', 1, 'md.jpg'],
+    ['', 'Haldiram\'s Namkeen - Moong Dal, 3x150 g Multipack', 'Haldiram\'s', '3x150 g', 165, 'snacks', 1, ''],
+    ['', 'Haldiram\'s Soan Papdi, 250 g', 'Haldiram\'s', '', 90, 'snacks', 1, ''],
+    ['8901396323303', 'Dettol Liquid Handwash - Skincare, 200 ml', 'Dettol', '', 75, 'personal', 0, ''],
+    ['', 'Dettol Original Soap, 125 g', 'Dettol', '', 45, 'personal', 0, ''],
+  ],
+};
+
+it('the first digits of a barcode tell the brand, even when that exact barcode is not in the list', () => {
+  const list = createProductList(BRANDS);
+
+  expect(list.brandsOfBarcode('8904004424430')).toEqual(['Haldiram\'s']);
+  expect(list.brandsOfBarcode('8901396999990')).toEqual(['Dettol']);
+  expect(list.brandsOfBarcode('8906001200178')).toEqual([]);
+});
+
+it('a company that makes several brands gives all of them, the most common first', () => {
+  const list = createProductList({ ...BRANDS, rows: [
+    ...BRANDS.rows,
+    ['8901396100004', 'Harpic Toilet Cleaner, 500 ml', 'Harpic', '', 99, 'household', 0, ''],
+  ] });
+
+  expect(list.brandsOfBarcode('8901396999990')).toEqual(['Dettol', 'Harpic']);
+});
+
+it('lists the brands\' products, those matching words read from the pack first, multipacks last', () => {
+  const list = createProductList(BRANDS);
+
+  const picks = list.productsOfBrands(['Haldiram\'s'], 'moong dal');
+
+  expect(picks.map((p) => p.name)).toEqual([
+    'Haldiram\'s Namkeen - Moong Dal, 1 kg Pouch',
+    'Haldiram  Moong Dal Namkeen, 200 g',
+    'Haldiram\'s Namkeen - Moong Dal, 3x150 g Multipack',
+    'Haldiram\'s Aloo Bhujia, 400 g',
+    'Haldiram\'s Soan Papdi, 250 g',
+  ]);
+  expect(picks[1]).toMatchObject({ price: 67, image: 'https://img.example/s/md.jpg' });
+});
+
+it('searches every product by the start of each word typed', () => {
+  const list = createProductList(BRANDS);
+
+  expect(list.search('moong').map((p) => p.price)).toEqual([260, 67, 165]);
+  expect(list.search('dett hand').map((p) => p.name)).toEqual(['Dettol Liquid Handwash - Skincare, 200 ml']);
+  expect(list.search('x')).toEqual([]);
+});

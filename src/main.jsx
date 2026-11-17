@@ -12,6 +12,16 @@ import { InventoryProvider } from "./context/InventoryContext";
 import AppShell from "./components/layout/AppShell";
 import Billing from "./components/billing/Billing";
 import { Splash } from "./components/layout/StartScreens";
+import { registerSW } from "virtual:pwa-register";
+
+// A new version is installed and shown straight away (the page reloads once),
+// and an app left open checks for one every hour.
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registration) {
+    if (registration) setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
+  },
+});
 
 // Home opens at once; the other pages are fetched the first time they are opened.
 const lazyPage = (load) => {

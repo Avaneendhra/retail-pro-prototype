@@ -10,6 +10,7 @@ import { downscale } from '../../lib/invoiceParser';
 import { lookupBarcode, lookupPrice, parseLabel, guessCategory, frameFromVideo, strictMatch } from '../../lib/productLookup';
 import { identifyProduct } from '../../lib/identifyProduct';
 import { loadProductList } from '../../lib/productList';
+import ProductPicker from './ProductPicker';
 import { parseBarcode } from '../../lib/barcodeData';
 import { expiryInfo, readDateInput, dateInputText } from '../../lib/expiry';
 import { openCamera, closeCamera, setTorch, scanVideoFrame, scanImage, loadImage, ocrLabel, warmUpBarcodeEngine } from '../../lib/scanEngine';
@@ -83,6 +84,7 @@ export default function AddStock() {
   const priceRef = useRef(null);
   const [priceError, setPriceError] = useState(false);
   const [readingPrice, setReadingPrice] = useState(false);
+  const [listState, setListState] = useState({ status: 'loading', count: 0 });
 
   useEffect(() => { try { localStorage.setItem(AUTO_KEY, auto ? 'on' : 'off'); } catch { /* ignore */ } }, [auto]);
 
@@ -97,8 +99,17 @@ export default function AddStock() {
 
   useEffect(() => {
     warmUpBarcodeEngine();
-    loadProductList(); // start downloading the product list before the first scan
+    // start downloading the product list before the first scan, and show whether it is ready
+    let gone = false;
+    const fetchList = () => loadProductList().then((list) => {
+      if (!gone) setListState(list ? { status: 'ready', count: list.size } : { status: 'failed', count: 0 });
+    });
+    fetchList();
+    const retry = () => { setListState({ status: 'loading', count: 0 }); fetchList(); };
+    window.addEventListener('online', retry);
     return () => {
+      gone = true;
+      window.removeEventListener('online', retry);
       workerRef.current?.terminate?.();
       closeCamera(camRef.current?.stream);
       camRef.current = null;
@@ -200,9 +211,10 @@ export default function AddStock() {
           if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
         }
       } else {
-        if (draft.placeholder) draft.name = '';
+        const notFound = !!draft.placeholder;
+        if (notFound) draft.name = '';
         setPriceError(false);
-        setResult({ ...draft, price: draft.price || '', qty: 1, min: 5, code: '', ...inputsOf(draft) });
+        setResult({ ...draft, notFound, price: draft.price || '', qty: 1, min: 5, code: '', ...inputsOf(draft) });
         if (navigator.vibrate) navigator.vibrate(60);
       }
     } finally {
@@ -359,6 +371,16 @@ export default function AddStock() {
     resume();
   };
   const set = (patch) => setResult(r => ({ ...r, ...patch }));
+  /** A product tapped in the pick list: its details are used, and the scanned barcode is kept with it. */
+  const pickProduct = (p) => {
+    setPriceError(false);
+    setResult((r) => ({
+      ...r, name: p.name, price: p.price > 0 ? String(p.price) : '', category: p.category || r.category, image: p.image || r.image,
+      notFound: false, placeholder: false, needsPrice: !(p.price > 0), mrpFromLabel: false,
+      sources: [...new Set([...(r.sources || []), 'list'])],
+      fieldSources: { ...r.fieldSources, name: 'list', category: 'list', price: p.price > 0 ? 'list' : undefined },
+    }));
+  };
   const manual = () => {
     setPriceError(false);
     setResult({ name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [], fieldSources: {}, batch: '', mfgText: '', expiryText: '' });
@@ -469,7 +491,10 @@ export default function AddStock() {
             )}
           </div>
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-            <span className={`badge ${useClaude ? 'badge-success' : 'badge-info'}`}>{useClaude ? t('addStock.engineClaude') : t('addStock.engineOcr')}</span>
+            <span className={`badge ${listState.status === 'ready' ? 'badge-success' : listState.status === 'failed' ? 'badge-warning' : 'badge-info'}`} role="status">
+              {listState.status === 'ready' ? t('addStock.listReady', { count: listState.count.toLocaleString('en-IN') })
+                : listState.status === 'failed' ? t('addStock.listFailed') : t('addStock.listLoading')}
+            </span>
             <button className="text-sm font-semibold text-[var(--primary)]" onClick={manual}>{t('addStock.manual')}</button>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
@@ -493,7 +518,13 @@ export default function AddStock() {
                   )}
                 </div>
               </div>
-              {result.needsPrice && <p className="text-sm text-[var(--warning)] mb-4" role="status">{t('addStock.needsPriceNote')}</p>}
+              {result.notFound && (
+                <p className="text-sm text-[var(--text-secondary)] mb-4" role="status">
+                  {t('addStock.notInList', { code: result.barcode || '—', count: listState.count.toLocaleString('en-IN') })}
+                </p>
+              )}
+              {result.notFound && <ProductPicker barcode={result.barcode} hint={result.labelText} onPick={pickProduct} />}
+              {result.needsPrice && !result.notFound && <p className="text-sm text-[var(--warning)] mb-4" role="status">{t('addStock.needsPriceNote')}</p>}
               {result.confirm && <p className="text-sm text-[var(--text-secondary)] mb-4" role="status">{t('addStock.confirmNote')}</p>}
               {reviewProduct && result.needsPrice && <div className="grid grid-cols-2 gap-4 mb-5">{priceField}</div>}
               {!reviewProduct && (

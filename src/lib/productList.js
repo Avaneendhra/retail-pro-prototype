@@ -30,6 +30,9 @@ function words(text) {
 const MULTIPACK = /\bpack\s*of\s*\d+|\b\d+\s*[x×]\s*\d|multi\s*-?\s*pack|\bcombo\b/i;
 
 const sameWord = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+/** "Haldiram's", "HALDIRAM" and "Haldiram" are one brand. */
+const brandKey = (brand) => String(brand || '').toLowerCase().replace(/['’]s\b/g, '').replace(/[^\p{L}\p{N}]/gu, '');
+
 const sizeKey = (s) => normalizeSize(s).toLowerCase().replace(/\s/g, '');
 
 function sizeOf(row) {
@@ -52,6 +55,37 @@ export function createProductList(data) {
 
   let index = null; // word -> row numbers, built on the first name search
   let rowWords = null;
+  let brands = null; // brand key -> { rows, names: display name -> count }
+  let prefixes = null; // first 7 to 10 digits of a barcode -> brand key -> count
+  const buildBrands = () => {
+    brands = new Map();
+    prefixes = new Map();
+    rows.forEach((row, i) => {
+      const key = brandKey(row[2]);
+      if (!key) return;
+      if (!brands.has(key)) brands.set(key, { rows: [], names: new Map() });
+      const b = brands.get(key);
+      b.rows.push(i);
+      b.names.set(row[2], (b.names.get(row[2]) || 0) + 1);
+      const code = normalizeCode(row[0]);
+      if (code.length !== 13) return;
+      for (let len = 7; len <= 10; len++) {
+        const p = code.slice(0, len);
+        if (!prefixes.has(p)) prefixes.set(p, new Map());
+        const m = prefixes.get(p);
+        m.set(key, (m.get(key) || 0) + 1);
+      }
+    });
+  };
+  const displayName = (key) => [...brands.get(key).names.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const startsWithAny = (have, w) => have.some((h) => h.startsWith(w) || (w.length >= 4 && w.startsWith(h) && h.length >= 4));
+  const ranked = (indices, want) => indices
+    .map((i, order) => {
+      const have = rowWords[i];
+      const found = want.filter((w) => startsWithAny(have, w)).length;
+      return { i, order, found, multi: MULTIPACK.test(rows[i][1]) ? 1 : 0, extra: have.length - found };
+    })
+    .sort((a, b) => b.found - a.found || a.multi - b.multi || a.extra - b.extra || a.order - b.order);
   const buildIndex = () => {
     index = new Map();
     rowWords = rows.map((row, i) => {
@@ -93,6 +127,45 @@ export function createProductList(data) {
         if (!best || cover > best.cover || (cover === best.cover && extra < best.extra)) best = { i, cover, extra };
       }
       return best ? toProduct(rows[best.i]) : null;
+    },
+
+    /**
+     * The brands of a barcode's company, read from the first digits of the barcodes
+     * in the list (the longest prefix that is known), most common first.
+     */
+    brandsOfBarcode(code) {
+      const c = normalizeCode(code);
+      if (c.length !== 13) return [];
+      if (!brands) buildBrands();
+      const found = [];
+      for (let len = 10; len >= 7; len--) {
+        const m = prefixes.get(c.slice(0, len));
+        if (!m) continue;
+        const total = [...m.values()].reduce((a, b) => a + b, 0);
+        for (const [key, n] of [...m.entries()].sort((a, b) => b[1] - a[1])) {
+          if (n / total >= 0.05 && !found.includes(key)) found.push(key);
+        }
+      }
+      return found.slice(0, 6).map(displayName);
+    },
+
+    /** The brands' products, those with the most of the hint's words first and multipacks after single packs. */
+    productsOfBrands(names, hint = '', limit = 30) {
+      if (!brands) buildBrands();
+      if (!index) buildIndex();
+      const all = names.flatMap((name) => brands.get(brandKey(name))?.rows || []);
+      return ranked(all, [...new Set(words(hint))]).slice(0, limit).map((r) => toProduct(rows[r.i]));
+    },
+
+    /** Every product whose words start with each word typed. */
+    search(query, limit = 20) {
+      const want = [...new Set(words(query))];
+      if (!want.length) return [];
+      if (!index) buildIndex();
+      const longest = [...want].sort((a, b) => b.length - a.length)[0];
+      const candidates = new Set();
+      for (const [word, list] of index) if (word.startsWith(longest)) for (const i of list) candidates.add(i);
+      return ranked([...candidates], want).filter((r) => r.found === want.length).slice(0, limit).map((r) => toProduct(rows[r.i]));
     },
   };
 }
