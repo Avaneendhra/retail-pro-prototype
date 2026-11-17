@@ -1,4 +1,5 @@
 import Fuse from 'fuse.js';
+import { parseLabelDetails } from './labelDetails.js';
 
 // Product identification helpers for the unified scanner:
 // barcode validation, open product database lookup, and label text parsing.
@@ -106,10 +107,7 @@ export function parseLabelText(text) {
   const lines = raw.split(/\r?\n/).map(l => l.replace(/[^\p{L}\p{N}\s.&'%/+-]/gu, ' ').replace(/\s+/g, ' ').trim()).filter(l => l.length >= 2);
 
   // MRP: "MRP ₹ 45.00", "M.R.P. Rs.45", "₹ 120"
-  let mrp = 0;
-  const mrpMatch = raw.match(/M\.?\s*R\.?\s*P\.?[^\d]{0,15}(\d{1,5}(?:\.\d{1,2})?)/i)
-    || raw.match(/(?:₹|Rs\.?|INR)\s*(\d{1,5}(?:\.\d{1,2})?)/i);
-  if (mrpMatch) mrp = Math.round(parseFloat(mrpMatch[1]));
+  const details = parseLabelDetails(raw); // MRP, manufacturing and expiry dates, batch
 
   const sizeMatch = raw.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gm|gms|grams?|ml|ltr|litres?|l)\b/i);
   const size = sizeMatch ? normalizeSize(sizeMatch[0]) : '';
@@ -126,7 +124,7 @@ export function parseLabelText(text) {
   const brand = brandLine ? titleCase(brandLine.toLowerCase()) : '';
   const base = (nameLine || brandLine).replace(new RegExp(`\\b${size.replace(/[.*+?^${}()|[\]\\]/g, '')}\\b`, 'i'), '').trim();
   const name = base ? composeName(brand, base.length > 3 && base === base.toUpperCase() ? base.toLowerCase() : base, size) : '';
-  return { name, brand, size, mrp, barcode: codeMatch };
+  return { name, brand, size, barcode: codeMatch, ...details };
 }
 
 /** Grab the current frame of a <video> as a JPEG data URL. */

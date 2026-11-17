@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { businessSummary, startOfDay } from '../../lib/insights';
 import { inr, pname, weekdayShort, fmtTime, fmtDate } from '../../lib/format';
 import PageHeader from '../layout/PageHeader';
+import { expiryInfo } from '../../lib/expiry';
 import { TrendMark } from '../inventory/Inventory';
 
 const pct = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`;
@@ -43,6 +44,17 @@ export default function Dashboard() {
     showToast(t('inventory.poCreated', { no: po.id }), 'success');
     navigate(`/orders?open=${po.id}`);
   };
+
+  // Packs past or near their expiry come first: they cost money every day they sit on the shelf.
+  const expiring = products
+    .map((p) => ({ p, info: expiryInfo(p.expiryDate) }))
+    .filter(({ p, info }) => info && info.status !== 'ok' && p.quantity > 0)
+    .sort((a, b) => a.info.days - b.info.days)
+    .slice(0, 3)
+    .map(({ p, info }) => (info.status === 'expired'
+      ? { key: 'insight.expired', productId: p.id, tone: 'danger' }
+      : { key: 'insight.expiresSoon', productId: p.id, tone: 'warning', params: { count: info.days } }));
+  const insights = [...expiring, ...sum.insights];
 
   const toneDot = { danger: 'bg-[var(--danger)]', warning: 'bg-[var(--warning)]', info: 'bg-[var(--accent-blue)]', muted: 'bg-[var(--text-muted)]' };
   const daysText = (d) => (d < 1 ? t('dashboard.todayShort') : t('dashboard.inDays', { n: Math.max(1, Math.round(d)) }));
@@ -87,8 +99,8 @@ export default function Dashboard() {
         <div className="card p-6 sm:p-7">
           <span className="eyebrow">{t('dashboard.insights')}</span>
           <ul className="mt-6 divide-y divide-[var(--border)]">
-            {sum.insights.length === 0 && <li className="py-4 text-[var(--text-secondary)]">{t('dashboard.noInsights')}</li>}
-            {sum.insights.map((ins, i) => {
+            {insights.length === 0 && <li className="py-4 text-[var(--text-secondary)]">{t('dashboard.noInsights')}</li>}
+            {insights.map((ins, i) => {
               const p = byId(ins.productId);
               return (
                 <li key={i}>

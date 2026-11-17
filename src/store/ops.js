@@ -15,9 +15,10 @@ export const emptyDataset = ({ device = { id: null, no: 0 }, counters = { bill: 
 
 const PRODUCT_DEFAULTS = {
   code: '', barcode: '', names: {}, aliases: [], category: 'other', price: 0, min: 0, coverDays: 7, quantity: 0, needsReview: false,
+  batch: '', mfgDate: '', expiryDate: '',
 };
-const PRODUCT_KEYS = ['id', 'code', 'barcode', 'name', 'names', 'aliases', 'category', 'price', 'min', 'coverDays', 'quantity', 'needsReview', 'createdAt'];
-const PRODUCT_PATCH_KEYS = ['name', 'names', 'aliases', 'code', 'barcode', 'category', 'price', 'min', 'coverDays', 'needsReview'];
+const PRODUCT_KEYS = ['id', 'code', 'barcode', 'name', 'names', 'aliases', 'category', 'price', 'min', 'coverDays', 'quantity', 'needsReview', 'createdAt', 'batch', 'mfgDate', 'expiryDate'];
+const PRODUCT_PATCH_KEYS = ['name', 'names', 'aliases', 'code', 'barcode', 'category', 'price', 'min', 'coverDays', 'needsReview', 'batch', 'mfgDate', 'expiryDate'];
 const PO_PATCH_KEYS = ['supplier', 'status', 'items'];
 
 const pick = (source, keys) => {

@@ -8,6 +8,7 @@ import { CATEGORIES } from '../../data/seed';
 import Modal from '../common/Modal';
 import PageHeader from '../layout/PageHeader';
 import { LANGUAGES } from '../../i18n';
+import { expiryInfo, dateInputText } from '../../lib/expiry';
 
 export const TrendMark = ({ trend }) => {
   const { t } = useTranslation();
@@ -20,6 +21,16 @@ export const StatusBadge = ({ status }) => {
   const { t } = useTranslation();
   const cls = status === 'out' ? 'badge-danger' : status === 'low' ? 'badge-warning' : 'badge-success';
   return <span className={`badge ${cls}`}>{t(`status.${status}`)}</span>;
+};
+
+/** "Expired" or "Expires in 5 days", only when it needs attention. */
+export const ExpiryBadge = ({ product }) => {
+  const { t } = useTranslation();
+  const info = expiryInfo(product.expiryDate);
+  if (!info || info.status === 'ok') return null;
+  return info.status === 'expired'
+    ? <span className="badge badge-danger">{t('inventory.expired')}</span>
+    : <span className="badge badge-warning">{t('inventory.expiresIn', { count: info.days })}</span>;
 };
 
 export const Spark = ({ series }) => {
@@ -128,6 +139,9 @@ function ProductDetail({ p, s, onWhy, onPO, onEdit }) {
             [t('inventory.avgDaily'), s.avg7.toFixed(1)],
             [t('inventory.trendLabel'), <TrendMark key="t" trend={s.trend} />],
             [t('inventory.predicted'), t(`demand.${s.demand}`)],
+            ...(p.mfgDate ? [[t('addStock.mfgDate'), dateInputText(p.mfgDate)]] : []),
+            ...(p.expiryDate ? [[t('addStock.expiryDate'), <span key="e" className="inline-flex items-center gap-2">{dateInputText(p.expiryDate)}<ExpiryBadge product={p} /></span>]] : []),
+            ...(p.batch ? [[t('addStock.batch'), p.batch]] : []),
           ].map(([k, v], i) => (
             <div key={i}><dt className="eyebrow text-[10px] mb-1.5">{k}</dt><dd className="font-semibold text-[17px]">{v}</dd></div>
           ))}
@@ -232,7 +246,7 @@ export default function Inventory() {
             return (
               <li key={p.id} id={`card-${p.id}`} className="inv-card">
                 <button className="inv-card-button" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
-                  <span className="font-medium truncate">{pname(p)}</span>
+                  <span className="font-medium truncate flex items-center gap-2">{pname(p)}<ExpiryBadge product={p} /></span>
                   <span className={`inv-card-stock ${s.status === 'out' ? 'text-[var(--danger)]' : s.status === 'low' ? 'text-[var(--warning)]' : ''}`}>{p.quantity}<span className="text-xs font-normal text-[var(--text-muted)]"> / {p.min}</span></span>
                   <span className="inv-card-sub truncate">{p.code} · {t(`cat.${p.category}`)}{p.needsReview ? ` · ${t('inventory.needsReview')}` : ''}</span>
                   <span className="inv-card-sub text-right">{s.recommendedQty > 0 ? `${t('inventory.recommendedOrder')} +${s.recommendedQty}` : t(`status.${s.status}`)}</span>
@@ -264,7 +278,7 @@ export default function Inventory() {
                   <React.Fragment key={p.id}>
                     <tr id={`row-${p.id}`} className="cursor-pointer" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
                       <td>
-                        <p className="font-medium flex items-center gap-2">{pname(p)}{p.needsReview && <span className="badge badge-warning">{t('inventory.needsReview')}</span>}</p>
+                        <p className="font-medium flex items-center gap-2">{pname(p)}{p.needsReview && <span className="badge badge-warning">{t('inventory.needsReview')}</span>}<ExpiryBadge product={p} /></p>
                         <p className="text-xs font-mono text-[var(--text-muted)] mt-0.5">{p.code} · {p.id} · {t(`cat.${p.category}`)}</p>
                       </td>
                       <td>

@@ -27,6 +27,7 @@ const productRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {
   id: r.id, code: r.code, barcode: r.barcode, name: r.name, names: parseJson(r.names, {}), aliases: parseJson(r.aliases, []),
   category: r.category, price: r.price, min: r.min_qty, coverDays: r.cover_days, quantity: r.quantity,
   needsReview: Boolean(r.needs_review), createdAt: r.created_at,
+  batch: r.batch, mfgDate: r.mfg_date, expiryDate: r.expiry_date,
 });
 
 const billRow = (r) => ({

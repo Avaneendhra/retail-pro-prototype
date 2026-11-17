@@ -54,6 +54,7 @@ export default {
   },
 
   inventory: {
+    expired: 'Expired', expiresIn: 'Expires in {{count}} days', expiresIn_one: 'Expires tomorrow', expiresIn_zero: 'Expires today',
     title: 'Inventory', subtitle: 'Stock is watched automatically. Products that need attention are shown first.',
     totalProducts: 'Products', stockValue: 'Stock value', needAttention: 'Need attention', addStock: 'Add product',
     searchPlaceholder: 'Search name, code or ID', allCategories: 'All categories', sortAttention: 'Needs attention', sortName: 'Name', sortStock: 'Stock',
@@ -101,6 +102,7 @@ export default {
   },
 
   insight: {
+    expired: '{{name}} has passed its expiry date. Take it off the shelf.', expiresSoon: '{{name}} expires in {{count}} days. Sell it first.', expiresSoon_one: '{{name}} expires tomorrow. Sell it first.', expiresSoon_zero: '{{name}} expires today.',
     runOutToday: '{{name}} may run out today. Reorder now.',
     runOutDays: '{{name}} may run out in about {{days}} days.',
     demandUp: 'Expected demand for {{name}} is increasing.',
@@ -109,14 +111,15 @@ export default {
   },
 
   addStock: {
+    mfgDate: 'Manufactured', expiryDate: 'Expires', batch: 'Batch', fromBarcode: 'From the barcode', fromLabel: 'From the label', errDate: 'Write dates as day/month/year or month/year, for example 15/08/2026 or 08/2026.', mfgShort: 'MFD {{date}}', expiryShort: 'EXP {{date}}', expiredShort: 'Expired {{date}}', batchShort: 'Batch {{batch}}',
     torch: 'Flash',
-    subtitleAuto: 'Show a product to the camera. It is recognised and added to stock automatically, with or without a barcode.',
+    subtitleAuto: 'Show the barcode to the camera. The product is recognised from the barcode first and added to stock automatically, with the label read only for missing details.',
     autoAdd: 'Auto-add', autoOn: 'Adds each product as soon as it is recognised', autoOff: 'Shows details to check before adding',
     tipAuto: 'Start the camera and hold each product in front of it for a second. Barcodes and labels are read automatically. Move the product away and back to add another one.',
     lookingAuto: 'Auto-adding · show a product', hold: 'Hold each product in view for a second',
     inStock: '{{qty}} in stock', needsDetails: 'check details', undo: 'Undo', undone: 'Removed {{name}}',
     placeholderName: 'Item {{code}}', setDetails: 'Set details', emptyAuto: 'Products you show to the camera will appear here as they are added.',
-    title: 'Add Product', subtitle: 'Point the camera at the product. One scanner reads the barcode and the label together, then shows the details to check.',
+    title: 'Add Product', subtitle: 'Point the camera at the barcode. It is read first; the label is read only for what the barcode does not hold, like MRP or dates. You check the details before adding.',
     startCamera: 'Start camera', stop: 'Stop', scan: 'Scan product', upload: 'Upload photo', manual: 'Enter manually',
     looking: 'Looking for a barcode…', stageBarcode: 'Reading the barcode…', stageLookup: 'Finding product details…', stageLabel: 'Reading the label…',
     tip: 'Hold the product 15–25 cm away in good light, with the barcode or front label inside the frame. Barcodes are picked up automatically; tap Scan to read the label.',

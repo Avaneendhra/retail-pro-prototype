@@ -7,23 +7,48 @@ import { useSettings } from '../../lib/settings';
 import { inr, pname } from '../../lib/format';
 import { CATEGORIES } from '../../data/seed';
 import { downscale } from '../../lib/invoiceParser';
-import { lookupBarcode, parseLabel, guessCategory, frameFromVideo, composeName, strictMatch } from '../../lib/productLookup';
+import { lookupBarcode, parseLabel, guessCategory, frameFromVideo, strictMatch } from '../../lib/productLookup';
+import { identifyProduct } from '../../lib/identifyProduct';
+import { parseBarcode } from '../../lib/barcodeData';
+import { expiryInfo, readDateInput, dateInputText } from '../../lib/expiry';
 import { openCamera, closeCamera, setTorch, scanVideoFrame, scanImage, loadImage, ocrLabel, warmUpBarcodeEngine } from '../../lib/scanEngine';
 
 const LABEL_EVERY_MS = 1800;   // how often the camera frame is checked for a label
+const BARCODE_FIRST_MS = 3500; // the label is only read after this long without a barcode in view
 const SAME_ITEM_GAP_MS = 4000; // the same product must leave the frame this long before it counts again
 const AUTO_KEY = 'sr2_auto_add';
 
 const readFile = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 
-/** Does OCR'd label text look like a real product (not background noise)? */
-const looksLikeProduct = (l) => {
-  if (!l?.name) return false;
-  const words = l.name.split(/\s+/).filter(w => /\p{L}{3,}/u.test(w));
-  return words.length >= 2 && (l.mrp > 0 || !!l.size || !!l.brand || !!l.barcode);
-};
-
 const itemKey = (draft) => draft.productId || draft.barcode || (draft.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** The batch and dates of a scanned pack, ready to save. */
+const packOf = (draft) => ({ batch: (draft.batch || '').trim(), mfgDate: draft.mfgDate || '', expiryDate: draft.expiryDate || '' });
+/** Review-card text inputs for those dates. */
+const inputsOf = (draft) => ({ batch: draft.batch || '', mfgText: dateInputText(draft.mfgDate), expiryText: dateInputText(draft.expiryDate) });
+
+function packLine(t, pack) {
+  const parts = [];
+  if (pack.mfgDate) parts.push(t('addStock.mfgShort', { date: dateInputText(pack.mfgDate) }));
+  if (pack.expiryDate) {
+    const info = expiryInfo(pack.expiryDate);
+    parts.push(info?.status === 'expired' ? t('addStock.expiredShort', { date: dateInputText(pack.expiryDate) }) : t('addStock.expiryShort', { date: dateInputText(pack.expiryDate) }));
+  }
+  if (pack.batch) parts.push(t('addStock.batchShort', { batch: pack.batch }));
+  return parts.join(' · ');
+}
+
+/** One pack detail on the review card, with where its value came from. */
+function PackField({ id, label, source, value, placeholder, onChange }) {
+  const { t } = useTranslation();
+  return (
+    <div className="min-w-0">
+      <label className="field-label" htmlFor={id}>{label}</label>
+      <input id={id} className="form-input font-mono" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      {source && <p className="text-[11px] text-[var(--success)] mt-1 truncate">{t(source === 'barcode' ? 'addStock.fromBarcode' : 'addStock.fromLabel')}</p>}
+    </div>
+  );
+}
 
 export default function AddStock() {
   const { t } = useTranslation();
@@ -51,6 +76,7 @@ export default function AddStock() {
   const lastSeenRef = useRef({});                  // key -> last time it was in view
   const lastAddedRef = useRef({ key: '', at: 0 });
   const lastBarcodeAtRef = useRef(0);
+  const cameraOnAtRef = useRef(0);
   const productsRef = useRef(products); productsRef.current = products;
   const fileRef = useRef(null);
 
@@ -91,68 +117,33 @@ export default function AddStock() {
     return parsed ? { ...parsed, category: guessCategory(parsed.name), engine: 'ocr' } : null;
   }, [useClaude, settings.apiKey, ocr, showToast, t]);
 
-  const decodeImage = useCallback(async (dataUrl) => {
-    try { return (await scanImage(await loadImage(dataUrl)))?.text || ''; } catch { return ''; }
-  }, []);
-
   /**
-   * Identify a product from a barcode and/or a camera frame.
-   * Returns a draft: { productId } for a known product, or new-product details, or null.
+   * Barcode first: the code from the camera (or decoded from the photo) decides the
+   * product and any batch, dates or price it carries; databases give the name; the
+   * label is read only for what is still missing.
    */
-  const identify = useCallback(async ({ barcode = '', dataUrl = null, quiet = false }) => {
-    let code = barcode;
-    if (!code && dataUrl) { if (!quiet) setStage('stageBarcode'); code = await decodeImage(dataUrl); }
-
-    const known = code ? findByBarcode(code) : null;
-    if (known) return { productId: known.id, barcode: code, sources: ['barcode', 'catalog'], image: dataUrl };
-
-    if (!quiet || code) setStage(code ? 'stageLookup' : 'stageLabel');
-    const [db, label] = await Promise.all([
-      code ? lookupBarcode(code) : Promise.resolve(null),
-      dataUrl ? readLabel(dataUrl, { quiet }) : Promise.resolve(null),
-    ]);
-    const labelSource = label?.engine === 'claude' ? 'claude' : 'label';
-
-    if (!code && label?.barcode) {
-      code = label.barcode;
-      const p = findByBarcode(code);
-      if (p) return { productId: p.id, barcode: code, sources: [labelSource, 'catalog'], image: dataUrl };
-    }
-    let existing = label?.matchedId ? byId(label.matchedId) : null;
-    if (!existing && !db && label?.name) existing = strictMatch(productsRef.current, label.name, label.size);
-    if (existing) return { productId: existing.id, barcode: code, sources: [labelSource, 'catalog'], image: dataUrl, mrp: label?.mrp || 0 };
-
-    // In the automatic label loop, ignore frames that don't clearly show a product
-    if (!code && !db && (label?.engine === 'ocr' ? !looksLikeProduct(label) : !label?.name)) return null;
-
-    const sources = [];
-    if (code) sources.push('barcode');
-    if (db) sources.push('database');
-    if (label?.name || label?.mrp) sources.push(labelSource);
-    const name = db?.name || (label?.name ? composeName(label.brand, label.name, label.size) : '');
-    return {
-      name: name || (code ? t('addStock.placeholderName', { code: code.slice(-6) }) : ''),
-      placeholder: !name,
-      category: db?.category && db.category !== 'other' ? db.category : (label?.category && label.category !== 'other' ? label.category : guessCategory(name)),
-      price: label?.mrp || 0,
-      mrpFromLabel: !!label?.mrp,
-      barcode: code || '',
-      image: db?.image || dataUrl,
-      sources,
-    };
-  }, [decodeImage, findByBarcode, byId, readLabel, t]);
+  const identify = useCallback(async ({ barcode = '', format = '', dataUrl = null, quiet = false }) => {
+    if (!quiet) setStage(barcode ? 'stageLookup' : 'stageBarcode');
+    return identifyProduct({ barcode, format, dataUrl, quiet }, {
+      decodeImage: async (url) => { try { return await scanImage(await loadImage(url)); } catch { return null; } },
+      lookup: (code) => { if (!quiet) setStage('stageLookup'); return lookupBarcode(code); },
+      readLabel: (url, opts) => { if (!quiet) setStage('stageLabel'); return readLabel(url, opts); },
+      findByBarcode, byId,
+      matchByName: (name, size) => strictMatch(productsRef.current, name, size),
+    });
+  }, [findByBarcode, byId, readLabel]);
 
   /* ── Add a draft to inventory (1 unit by default) ── */
   const commit = useCallback((draft, qty = 1) => {
     let changes;
     if (draft.productId) {
-      changes = receiveStock([{ productId: draft.productId, qty }], { reason: 'scan' });
+      changes = receiveStock([{ productId: draft.productId, qty, details: packOf(draft) }], { reason: 'scan' });
     } else {
       const needsReview = draft.placeholder || !(Number(draft.price) > 0);
       changes = receiveStock([{
         newProduct: {
           name: draft.name.trim(), barcode: draft.barcode || undefined, code: draft.code?.trim().toUpperCase() || undefined,
-          price: Number(draft.price) || 0, category: draft.category, min: Number(draft.min) || 5, needsReview,
+          price: Number(draft.price) || 0, category: draft.category, min: Number(draft.min) || 5, needsReview, ...packOf(draft),
         },
         qty,
       }], { reason: 'scan' });
@@ -163,7 +154,7 @@ export default function AddStock() {
       productId: ch.productId, name: draft.productId ? pname(byId(draft.productId)) : draft.name, qty, isNew: !!ch.isNew,
       after: ch.after, price: draft.productId ? byId(draft.productId)?.price : Number(draft.price) || 0,
       needsReview: !draft.productId && (draft.placeholder || !(Number(draft.price) > 0)),
-      sources: draft.sources, image: draft.image, changes, at: Date.now(),
+      sources: draft.sources, image: draft.image, changes, at: Date.now(), ...packOf(draft),
     };
     setRecent(r => [entry, ...r].slice(0, 15));
     return entry;
@@ -179,6 +170,8 @@ export default function AddStock() {
         if (!input.quiet) showToast(t('addStock.errRead'), 'error');
         return;
       }
+      if (draft.placeholder) draft.name = t('addStock.placeholderName', { code: (draft.barcode || '').slice(-6) });
+      if (!draft.category) draft.category = guessCategory(draft.name);
       const key = itemKey(draft);
       const now = Date.now();
       const seenGap = now - (lastSeenRef.current[key] || 0);
@@ -195,7 +188,7 @@ export default function AddStock() {
           if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
         }
       } else {
-            setResult({ ...draft, qty: 1, min: 5, code: '' });
+        setResult({ ...draft, qty: 1, min: 5, code: '', ...inputsOf(draft) });
       }
     } finally {
       setStage(null);
@@ -206,13 +199,13 @@ export default function AddStock() {
   const handleRef = useRef(handle); handleRef.current = handle;
 
   /* ── Live barcode detection on our own video, several times a second ── */
-  const onBarcode = useCallback((text) => {
+  const onBarcode = useCallback((text, format = '') => {
     lastBarcodeAtRef.current = Date.now();
     const c = confirmRef.current;
     c.count = c.code === text ? c.count + 1 : 1;
     c.code = text;
     // keep refreshing "last seen" for the product already added, so it isn't re-added while held still
-    const p = findByBarcode(text);
+    const p = findByBarcode(parseBarcode(text, format).code);
     const key = p ? p.id : text;
     if (lastAddedRef.current.key === key && Date.now() - (lastSeenRef.current[key] || 0) < SAME_ITEM_GAP_MS) {
       lastSeenRef.current[key] = Date.now();
@@ -221,7 +214,7 @@ export default function AddStock() {
     if (c.count < 2 || busyRef.current) return;
     confirmRef.current = { code: '', count: 0 };
     const frame = frameFromVideo(videoRef.current, 1400);
-    handleRef.current({ barcode: text, dataUrl: frame, quiet: true });
+    handleRef.current({ barcode: text, format, dataUrl: frame, quiet: true });
   }, [findByBarcode]);
   const onBarcodeRef = useRef(onBarcode); onBarcodeRef.current = onBarcode;
 
@@ -233,7 +226,7 @@ export default function AddStock() {
       const v = videoRef.current;
       if (v && !resultRef.current) {
         const hit = await scanVideoFrame(v, attempt++).catch(() => null);
-        if (hit && !stopped) onBarcodeRef.current(hit.text);
+        if (hit && !stopped) onBarcodeRef.current(hit.text, hit.format);
       }
       if (!stopped) setTimeout(loop, 90);
     };
@@ -246,7 +239,9 @@ export default function AddStock() {
     if (!live) return;
     const id = setInterval(() => {
       if (busyRef.current || resultRef.current) return;
-      if (Date.now() - lastBarcodeAtRef.current < 2500) return; // a barcode is in view, let that path handle it
+      const now = Date.now();
+      // Barcode first: give the barcode reader a head start, and never read a label while a barcode is in view.
+      if (now - cameraOnAtRef.current < BARCODE_FIRST_MS || now - lastBarcodeAtRef.current < BARCODE_FIRST_MS) return;
       const frame = frameFromVideo(videoRef.current, 1400);
       if (frame) handleRef.current({ dataUrl: frame, quiet: true });
     }, LABEL_EVERY_MS);
@@ -258,6 +253,7 @@ export default function AddStock() {
       const cam = await openCamera(videoRef.current);
       camRef.current = cam;
       setHasTorch(cam.hasTorch);
+      cameraOnAtRef.current = Date.now();
       setLive(true);
     } catch {
       showToast(t('addStock.errCamera'), 'error');
@@ -308,14 +304,17 @@ export default function AddStock() {
     if (!result) return;
     const qty = Math.max(1, parseInt(result.qty, 10) || 1);
     if (!result.productId && !result.name.trim()) { showToast(t('addStock.errName'), 'error'); return; }
-    const entry = commit(result, qty);
+    const mfgDate = readDateInput(result.mfgText);
+    const expiryDate = readDateInput(result.expiryText);
+    if (mfgDate === null || expiryDate === null) { showToast(t('addStock.errDate'), 'error'); return; }
+    const entry = commit({ ...result, mfgDate, expiryDate }, qty);
     if (entry) showToast(entry.isNew ? t('addStock.toastAdded', { name: entry.name }) : t('addStock.toastStock', { qty, name: entry.name }), 'success');
     setResult(null);
     resume();
   };
   const set = (patch) => setResult(r => ({ ...r, ...patch }));
   const manual = () => {
-    setResult({ name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [] });
+    setResult({ name: '', category: 'grocery', price: '', barcode: '', code: '', min: 5, qty: 1, image: null, sources: [], fieldSources: {}, batch: '', mfgText: '', expiryText: '' });
   };
   const reviewProduct = result?.productId ? byId(result.productId) : null;
 
@@ -378,6 +377,7 @@ export default function AddStock() {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold truncate">+{flash.qty} {flash.name}</p>
                     <p className="text-xs text-white/60">{flash.isNew ? t('addStock.newBadge') : t('addStock.inStock', { qty: flash.after })}{flash.needsReview ? ` · ${t('addStock.needsDetails')}` : ''}</p>
+                    {(flash.mfgDate || flash.expiryDate || flash.batch) && <p className="text-xs text-white/80 mt-0.5">{packLine(t, flash)}</p>}
                   </div>
                   <button className="btn btn-sm !bg-white/10 !text-white" onClick={plusOne}>+1</button>
                   <button className="btn btn-sm !bg-white/10 !text-white" onClick={undo}>{t('addStock.undo')}</button>
@@ -434,7 +434,8 @@ export default function AddStock() {
                   <div>
                     <label className="field-label" htmlFor="as-price">{t('addStock.price')}</label>
                     <input id="as-price" className="form-input font-mono" inputMode="decimal" value={result.price || ''} onChange={e => set({ price: e.target.value.replace(/[^\d.]/g, ''), mrpFromLabel: false })} />
-                    {result.mrpFromLabel && <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.mrpHint')}</p>}
+                    {result.fieldSources?.price === 'barcode' ? <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.fromBarcode')}</p>
+                      : result.mrpFromLabel && <p className="text-[11px] text-[var(--success)] mt-1">{t('addStock.mrpHint')}</p>}
                   </div>
                   <div>
                     <label className="field-label" htmlFor="as-cat">{t('common.category')}</label>
@@ -452,6 +453,11 @@ export default function AddStock() {
                   </div>
                 </div>
               )}
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <PackField id="as-mfg" label={t('addStock.mfgDate')} source={result.fieldSources?.mfgDate} value={result.mfgText} placeholder="08/2026" onChange={(v) => set({ mfgText: v })} />
+                <PackField id="as-exp" label={t('addStock.expiryDate')} source={result.fieldSources?.expiryDate} value={result.expiryText} placeholder="02/2027" onChange={(v) => set({ expiryText: v })} />
+                <PackField id="as-batch" label={t('addStock.batch')} source={result.fieldSources?.batch} value={result.batch} onChange={(v) => set({ batch: v })} />
+              </div>
               <div className="flex flex-wrap items-end gap-3">
                 <div className="w-32">
                   <label className="field-label" htmlFor="as-qty">{t('addStock.quantity')}</label>
@@ -483,6 +489,7 @@ export default function AddStock() {
                       <span>{r.isNew ? t('addStock.newBadge') : t('addStock.stockBadge')}</span>
                       {r.price > 0 && <span className="font-mono">{inr(r.price)}</span>}
                       {r.sources?.map(s => <span key={s}>· {t(`addStock.sources.${s}`)}</span>)}
+                      {r.expiryDate && <span>· {t('addStock.expiryShort', { date: dateInputText(r.expiryDate) })}</span>}
                     </p>
                   </div>
                   {r.needsReview
