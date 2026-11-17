@@ -31,7 +31,7 @@ const productRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {
 
 const billRow = (r) => ({
   id: r.id, billNo: r.bill_no, at: r.at, total: r.total, payment: parseJson(r.payment, {}), items: parseJson(r.items, []),
-  deviceNo: r.device_no, userId: r.user_id, ...(r.seed ? { seed: true } : {}),
+  deviceNo: r.device_no, userId: r.user_id, ...(r.seed ? { seed: true } : {}), ...(r.discount ? { discount: r.discount } : {}),
 });
 
 const poRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {

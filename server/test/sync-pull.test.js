@@ -226,3 +226,17 @@ test('a malformed sync body is refused', async () => {
     assert.equal(res.error.code, 'invalid_input');
   }
 });
+
+test('a discount on a bill is kept and comes back', async () => {
+  const { app, owner } = await shopWithMilk();
+  const sale = saleOp([['P1', 2]], { billId: 'BA9' });
+  sale.bill = { ...sale.bill, total: 50, discount: 10 };
+
+  await sync(app, owner.token, { ops: [sale, saleOp([['P1', 1]], { billId: 'BA10' })] });
+  const res = await sync(app, owner.token);
+
+  const byId = Object.fromEntries(res.changes.bills.map((b) => [b.id, b]));
+  assert.equal(byId.BA9.discount, 10);
+  assert.equal(byId.BA9.total, 50);
+  assert.equal('discount' in byId.BA10, false);
+});

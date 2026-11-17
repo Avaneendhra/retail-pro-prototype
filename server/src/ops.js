@@ -64,6 +64,7 @@ const Bill = z.object({
   total: Money,
   payment: z.object({ method: z.string().min(1).max(20), received: z.number().nullish() }),
   items: z.array(BillItem).min(1).max(200),
+  discount: Money.optional(),
   seed: z.boolean().optional(),
 });
 
@@ -184,9 +185,9 @@ const productStatement = (ctx, products) => insertRows(
 
 const billStatement = (ctx, bills) => insertRows(
   ctx, 'bills',
-  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed'],
+  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed', 'discount'],
   bills.map((b) => ({
-    id: b.id, bill_no: b.billNo, at: b.at, total: b.total, payment: JSON.stringify(b.payment), items: JSON.stringify(b.items), seed: b.seed ? 1 : 0,
+    id: b.id, bill_no: b.billNo, at: b.at, total: b.total, payment: JSON.stringify(b.payment), items: JSON.stringify(b.items), seed: b.seed ? 1 : 0, discount: b.discount || 0,
   })),
   [['user_id', '?4'], ['device_no', '(SELECT device_no FROM devices WHERE shop_id = ?1 AND id = ?5)']], [ctx.userId, ctx.deviceId],
 );

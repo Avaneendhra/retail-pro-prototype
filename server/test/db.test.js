@@ -61,7 +61,7 @@ test('migrate applies each file once', () => {
   const first = migrate(db, MIGRATIONS);
   const second = migrate(db, MIGRATIONS);
 
-  assert.deepEqual(first, ['0001_init.sql']);
+  assert.deepEqual(first, ['0001_init.sql', '0002_bill_discount.sql']);
   assert.deepEqual(second, []);
 });
 

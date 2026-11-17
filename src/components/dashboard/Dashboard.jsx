@@ -4,14 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
 import { businessSummary, startOfDay } from '../../lib/insights';
-import { inr, pname, weekdayShort, fmtTime } from '../../lib/format';
+import { inr, pname, weekdayShort, fmtTime, fmtDate } from '../../lib/format';
+import PageHeader from '../layout/PageHeader';
 import { TrendMark } from '../inventory/Inventory';
 
 const pct = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`;
 
 function ListCard({ title, tag, children, accent }) {
   return (
-    <div className={`card p-7 flex flex-col ${accent || ''}`}>
+    <div className={`card p-6 flex flex-col ${accent || ''}`}>
       <div className="flex items-start justify-between mb-5">
         <span className="eyebrow">{title}</span>
         {tag && <span className="tag">{tag}</span>}
@@ -34,7 +35,7 @@ export default function Dashboard() {
   const hot = [...sum.days].map(d => d.revenue).sort((a, b) => b - a)[2] ?? 0;
   const today = sum.days[6], yesterday = sum.days[5];
   const delta = yesterday.revenue > 0 ? ((today.revenue - yesterday.revenue) / yesterday.revenue) * 100 : null;
-  const billsToday = bills.filter(b => b.at >= startOfDay(0)).length;
+  const billsToday = bills.filter(b => b.at >= startOfDay(0));
   const healthy = products.filter(p => stats[p.id].status === 'ok').length;
 
   const orderAll = () => {
@@ -48,56 +49,42 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* ── Hero + headline ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-6 lg:gap-10 mb-6 pt-2 lg:pt-6">
-        <div className="flex flex-col justify-center">
-          <div className="flex items-center gap-3 eyebrow mb-8">
-            <span className="status-dot" />{t('dashboard.storeOpen')}<span className="opacity-60">•</span>
-            <span className="font-mono tracking-[0.06em]">{t('dashboard.skus', { count: products.length })}</span>
+      <PageHeader title={t('nav.dashboard')} subtitle={t('dash.subtitle', { date: fmtDate(Date.now(), { weekday: 'long', day: 'numeric', month: 'long' }) })}>
+        <Link to="/home" className="btn btn-cta">{t('dashboard.startSale')}</Link>
+      </PageHeader>
+
+      <section className="kpi-grid" aria-label={t('dashboard.today')}>
+        <div className="kpi card-accent-blue">
+          <div className="flex items-start justify-between gap-3">
+            <span className="kpi-label">{t('dashboard.revenue7')}</span>
+            {sum.weekChangePct !== null && <span className="text-sm font-semibold">{t('dashboard.weekChange', { pct: pct(sum.weekChangePct) })}</span>}
           </div>
-          <h1 className="display-xl">{t('dashboard.heroTitle1')}<br />{t('dashboard.heroTitle2')}<br />{t('dashboard.heroTitle3')}</h1>
-          <p className="text-[var(--text-secondary)] text-lg leading-relaxed max-w-md mt-8">{t('dashboard.heroSub')}</p>
-          <div className="flex flex-wrap gap-3 mt-10">
-            <Link to="/home" className="btn btn-cta">{t('dashboard.startSale')}</Link>
-            <Link to="/inventory" className="btn btn-ghost">{t('dashboard.viewStock')}</Link>
+          <span className="kpi-value">{inr(sum.revenue7)}</span>
+          <div className="pill-bars mt-3">
+            {sum.days.map((d, i) => (
+              <div key={i} title={`${weekdayShort(d.start)}: ${inr(d.revenue)}`}>
+                <div className={`pill-bar ${d.revenue > 0 && d.revenue >= hot ? 'hot' : ''}`} style={{ height: `${Math.max(18, (d.revenue / weekMax) * 100)}%` }} />
+                <span>{weekdayShort(d.start)}</span>
+              </div>
+            ))}
           </div>
         </div>
-
-        <div className="flex flex-col gap-6">
-          <div className="card card-accent-blue p-8">
-            <div className="flex items-start justify-between">
-              <span className="eyebrow">{t('dashboard.revenue7')}</span>
-              {sum.weekChangePct !== null && <span className="text-sm font-semibold">{t('dashboard.weekChange', { pct: pct(sum.weekChangePct) })}</span>}
-            </div>
-            <div className="metric text-[60px] sm:text-[72px] mt-4">{inr(sum.revenue7)}</div>
-            <div className="pill-bars mt-8">
-              {sum.days.map((d, i) => (
-                <div key={i} title={`${weekdayShort(d.start)}: ${inr(d.revenue)}`}>
-                  <div className={`pill-bar ${d.revenue > 0 && d.revenue >= hot ? 'hot' : ''}`} style={{ height: `${Math.max(27, (d.revenue / weekMax) * 100)}%` }} />
-                  <span>{weekdayShort(d.start)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card p-8 relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <span className="eyebrow">{t('dashboard.today')}</span>
-              <span className="eyebrow">{t('dashboard.live')}</span>
-            </div>
-            <div className="metric text-[60px] sm:text-[68px] mt-6">{inr(today.revenue)}</div>
-            <div className="mt-6 font-semibold flex flex-wrap gap-x-4 gap-y-1">
-              {delta !== null && <span className={delta >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>{t('dashboard.vsYesterday', { pct: pct(delta) })}</span>}
-              <span className="text-[var(--text-secondary)] font-medium">{t('dashboard.billsToday', { count: billsToday })}</span>
-            </div>
-            <div className="hatch absolute right-0 bottom-0 w-48 h-20 pointer-events-none" />
-          </div>
+        <div className="kpi">
+          <span className="kpi-label">{t('dashboard.today')}</span>
+          <span className="kpi-value">{inr(today.revenue)}</span>
+          {delta !== null && <span className={`kpi-sub font-semibold ${delta >= 0 ? '!text-[var(--success)]' : '!text-[var(--danger)]'}`}>{t('dashboard.vsYesterday', { pct: pct(delta) })}</span>}
+        </div>
+        <div className="kpi">
+          <span className="kpi-label">{t('dash.billsLabel')}</span>
+          <span className="kpi-value">{billsToday.length}</span>
+          {billsToday.length > 0 && <span className="kpi-sub">{t('dash.avgBill', { amount: inr(billsToday.reduce((s, b) => s + b.total, 0) / billsToday.length) })}</span>}
+          <Link to="/bills" className="text-btn self-start -ml-2.5 mt-auto">{t('dash.seeBills')}</Link>
         </div>
       </section>
 
       {/* ── Insights + forecast ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-6 mb-6">
-        <div className="card p-8">
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-4 mb-4">
+        <div className="card p-6 sm:p-7">
           <span className="eyebrow">{t('dashboard.insights')}</span>
           <ul className="mt-6 divide-y divide-[var(--border)]">
             {sum.insights.length === 0 && <li className="py-4 text-[var(--text-secondary)]">{t('dashboard.noInsights')}</li>}
@@ -116,16 +103,16 @@ export default function Dashboard() {
           </ul>
         </div>
 
-        <div className="card card-accent-pink p-8 flex flex-col">
+        <div className="card card-accent-pink p-6 sm:p-7 flex flex-col">
           <span className="eyebrow">{t('dashboard.predicted')}</span>
-          <div className="metric text-[60px] mt-6">{inr(Math.round(sum.predictedNext7 / 10) * 10)}</div>
+          <div className="kpi-value mt-3">{inr(Math.round(sum.predictedNext7 / 10) * 10)}</div>
           {sum.predictedChangePct !== null && <p className="text-[18px] font-semibold mt-3">{t('dashboard.vsThisWeek', { pct: pct(sum.predictedChangePct) })}</p>}
           <p className="mt-auto pt-8 text-[15px] leading-snug">{t('dashboard.predictedSub')}</p>
         </div>
       </section>
 
       {/* ── Fast / slow / run out ── */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <ListCard title={t('dashboard.fast')} tag="7d">
           {sum.fast.map(({ p, s }, i) => (
             <div key={p.id} className={`flex items-center justify-between gap-3 py-3 ${i ? 'border-t border-[var(--border)]' : ''}`}>
@@ -154,7 +141,7 @@ export default function Dashboard() {
       </section>
 
       {/* ── Replenishment + low stock ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-6 mb-6">
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-4 mb-4">
         <div className="card overflow-hidden">
           <div className="p-7 pb-4 flex flex-wrap items-center justify-between gap-4">
             <span className="eyebrow">{t('dashboard.replenish')}</span>
@@ -209,7 +196,7 @@ export default function Dashboard() {
 
       {/* ── Recent bills ── */}
       <section className="card p-7">
-        <span className="eyebrow">{t('dashboard.recentBills')}</span>
+        <div className="flex items-center justify-between gap-3"><span className="section-label">{t('dashboard.recentBills')}</span><Link to="/bills" className="text-btn">{t('dash.seeBills')}</Link></div>
         {bills.length === 0 ? <p className="mt-4 text-[var(--text-secondary)]">{t('dashboard.noBills')}</p> : (
           <div className="mt-4 divide-y divide-[var(--border)]">
             {bills.slice(0, 6).map(b => (

@@ -66,6 +66,7 @@ How the numbers are worked out:
 | Route | Page |
 |---|---|
 | `#/home` | Home: billing, the default screen |
+| `#/bills` | Past bills: day totals by cash, UPI and card; reprint or share on WhatsApp |
 | `#/dashboard` | Sales, forecast, insights and alerts |
 | `#/inventory` | Stock list with velocity and recommendations |
 | `#/add-stock` | Add Product: automatic camera scanning |

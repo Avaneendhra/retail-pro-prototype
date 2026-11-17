@@ -4,6 +4,7 @@ import { createHashRouter, RouterProvider, Navigate } from "react-router-dom";
 import "./i18n";
 import "./index.css";
 import "./styles/pos.css";
+import "./styles/layout.css";
 import { ToastProvider } from "./context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { InventoryProvider } from "./context/InventoryContext";
@@ -18,6 +19,7 @@ const lazyPage = (load) => {
   return () => <React.Suspense fallback={<Splash />}><Page /></React.Suspense>;
 };
 const Dashboard = lazyPage(() => import("./components/dashboard/Dashboard"));
+const Bills = lazyPage(() => import("./components/bills/Bills"));
 const Inventory = lazyPage(() => import("./components/inventory/Inventory"));
 const AddStock = lazyPage(() => import("./components/inventory/AddStock"));
 const SupplierInvoice = lazyPage(() => import("./components/invoice/SupplierInvoice"));
@@ -30,6 +32,7 @@ const router = createHashRouter([
       { path: "/", element: <Navigate to="/home" replace /> },
       { path: "/home", element: <Billing /> },
       { path: "/billing", element: <Navigate to="/home" replace /> },
+      { path: "/bills", element: <Bills /> },
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/inventory", element: <Inventory /> },
       { path: "/add-stock", element: <AddStock /> },

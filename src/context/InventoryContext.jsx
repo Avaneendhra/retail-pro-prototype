@@ -56,10 +56,14 @@ function useShop(engine, data, numbers, mode, showToast) {
 
   // The sample history is kept as one summary bill a day: it counts as sales but is not a bill to list.
   const bills = useMemo(() => data.bills.filter((b) => !b.seed), [data.bills]);
-  const sales = useMemo(() => data.bills.flatMap((b) => b.items.map((item, index) => ({
-    id: `${b.id}-${index}`, billId: b.seed ? null : b.id, productId: item.productId, productName: item.name,
-    qty: item.qty, price: item.price, total: item.total, date: b.at,
-  }))), [data.bills]);
+  // A discount is spread over the bill's lines, so sales figures add up to what was actually paid.
+  const sales = useMemo(() => data.bills.flatMap((b) => {
+    const share = b.discount ? b.total / Math.max(1, b.total + b.discount) : 1;
+    return b.items.map((item, index) => ({
+      id: `${b.id}-${index}`, billId: b.seed ? null : b.id, productId: item.productId, productName: item.name,
+      qty: item.qty, price: item.price, total: share === 1 ? item.total : Math.round(item.total * share * 100) / 100, date: b.at,
+    }));
+  }), [data.bills]);
 
   const stats = useMemo(() => computeStats(products, sales), [products, sales]);
   const lowStockProducts = useMemo(() => products.filter((p) => p.quantity <= (p.min ?? 0)), [products]);
@@ -86,8 +90,8 @@ function useShop(engine, data, numbers, mode, showToast) {
     }
   }, [showToast]);
 
-  /** Completes a sale. cart: [{ productId, qty }] */
-  const checkout = useCallback((cart, payment = { method: 'cash' }) => {
+  /** Completes a sale. cart: [{ productId, qty }]; `discount` is an amount in rupees taken off the total. */
+  const checkout = useCallback((cart, payment = { method: 'cash' }, { discount = 0 } = {}) => {
     const stock = current().products;
     const lines = [];
     for (const item of cart) {
@@ -100,9 +104,12 @@ function useShop(engine, data, numbers, mode, showToast) {
 
     const { n, code } = engine.takeNumber('bill');
     const items = lines.map(({ p, qty }) => ({ productId: p.id, name: p.name, names: p.names, code: p.code, qty, price: p.price, total: qty * p.price }));
+    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+    const off = Math.min(subtotal, Math.round(money(discount) * 100) / 100);
     const bill = {
       id: billId(code, n), billNo: billNo(code, n), at: Date.now(),
-      total: items.reduce((sum, item) => sum + item.total, 0),
+      total: Math.round((subtotal - off) * 100) / 100,
+      ...(off > 0 ? { discount: off } : {}),
       payment: { method: text(payment.method, 20) || 'cash', ...(Number(payment.received) > 0 ? { received: Number(payment.received) } : {}) },
       items,
     };
