@@ -105,7 +105,9 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
   take('name', listed?.name, 'list');
   take('category', listed?.category && listed.category !== 'other' ? listed.category : '', 'list');
   take('name', db?.name, 'database');
-  take('name', label?.name, labelSource);
+  // A scanned barcode nobody knows: text read from the pack is often not the name, so it is only offered.
+  const unknownBarcode = !!draft.barcode && !db?.name && !listed;
+  if (!unknownBarcode) take('name', label?.name, labelSource);
   take('category', db?.category && db.category !== 'other' ? db.category : '', 'database');
   take('category', label?.category && label.category !== 'other' ? label.category : '', labelSource);
   if (listed?.image) draft.image = listed.image;
@@ -113,5 +115,5 @@ export async function identifyProduct({ barcode = '', format = '', dataUrl = nul
 
   if (db) sources.push('database');
   if (Object.values(fieldSources).includes(labelSource)) sources.push(labelSource);
-  return { ...draft, placeholder: !draft.name, needsPrice: !(draft.price > 0), confirm: listedByName, mrpFromLabel: fieldSources.price === labelSource, sources, fieldSources };
+  return { ...draft, placeholder: !draft.name, needsPrice: !(draft.price > 0), confirm: listedByName, labelText: unknownBarcode ? label?.name || '' : '', mrpFromLabel: fieldSources.price === labelSource, sources, fieldSources };
 }

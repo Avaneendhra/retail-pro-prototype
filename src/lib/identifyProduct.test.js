@@ -51,8 +51,8 @@ it('the label only fills in what the barcode and the database did not give', asy
 
   const draft = await identifyProduct({ barcode: '(01)08906010400019(17)270101', dataUrl: FRAME }, d);
 
-  expect(draft).toMatchObject({ barcode: '8906010400019', name: 'Some Biscuit', price: 10, mfgDate: '2026-10', expiryDate: '2027-01-01', batch: 'K7' });
-  expect(draft.fieldSources).toMatchObject({ name: 'label', price: 'label', mfgDate: 'label', expiryDate: 'barcode', batch: 'label' });
+  expect(draft).toMatchObject({ barcode: '8906010400019', name: '', labelText: 'Some Biscuit', price: 10, mfgDate: '2026-10', expiryDate: '2027-01-01', batch: 'K7' });
+  expect(draft.fieldSources).toMatchObject({ price: 'label', mfgDate: 'label', expiryDate: 'barcode', batch: 'label' });
 });
 
 it('a product already in stock is recognised by its barcode, with the dates of this pack', async () => {
@@ -178,4 +178,12 @@ it('a product without a barcode is found in the list by the name on its label, a
   expect(d.findListedByName).toHaveBeenCalledWith('Haldiram Aloo Bhujia', '200g');
   expect(draft).toMatchObject({ name: 'Haldiram Aloo Bhujia Namkeen, 200 g', price: 67, category: 'snacks', confirm: true, needsPrice: false });
   expect(draft.fieldSources.price).toBe('list');
+});
+
+it('when a scanned barcode is not known anywhere, text read from the pack is not used as its name', async () => {
+  const d = deps({ readLabel: vi.fn(async () => ({ name: 'Net Wt Store Cool Dry', mrp: 0 })) });
+
+  const draft = await identifyProduct({ barcode: '8904004424430', format: 'EAN13', dataUrl: FRAME }, d);
+
+  expect(draft).toMatchObject({ barcode: '8904004424430', name: '', placeholder: true, labelText: 'Net Wt Store Cool Dry' });
 });
