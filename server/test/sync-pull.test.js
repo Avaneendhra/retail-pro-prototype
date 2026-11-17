@@ -4,7 +4,7 @@ import { signup, login, sync, shopWithMilk, createProductOp, saleOp, opId, T0, D
 
 const MILK = {
   id: 'P1', code: 'ML', barcode: '8901262010016', name: 'Milk 500ml', names: {}, aliases: [], category: 'dairy',
-  price: 30, min: 20, coverDays: 2, quantity: 40, needsReview: false, createdAt: T0,
+  price: 30, min: 20, coverDays: 2, quantity: 40, needsReview: false, createdAt: T0, batch: '', mfgDate: '', expiryDate: '',
 };
 const NOTHING = { products: [], bills: [], purchaseOrders: [], invoices: [] };
 const secondDevice = (app, deviceId = 'device-b') => login(app, { login: 'lakshmi@example.com', deviceId });
@@ -225,4 +225,32 @@ test('a malformed sync body is refused', async () => {
     assert.equal(res.status, 400, JSON.stringify(body));
     assert.equal(res.error.code, 'invalid_input');
   }
+});
+
+test('a discount on a bill is kept and comes back', async () => {
+  const { app, owner } = await shopWithMilk();
+  const sale = saleOp([['P1', 2]], { billId: 'BA9' });
+  sale.bill = { ...sale.bill, total: 50, discount: 10 };
+
+  await sync(app, owner.token, { ops: [sale, saleOp([['P1', 1]], { billId: 'BA10' })] });
+  const res = await sync(app, owner.token);
+
+  const byId = Object.fromEntries(res.changes.bills.map((b) => [b.id, b]));
+  assert.equal(byId.BA9.discount, 10);
+  assert.equal(byId.BA9.total, 50);
+  assert.equal('discount' in byId.BA10, false);
+});
+
+test('a product keeps its batch, manufacturing and expiry dates, and they can be updated', async () => {
+  const { app, owner } = await shopWithMilk();
+
+  await sync(app, owner.token, { ops: [createProductOp({ id: 'P7', name: 'Amul Butter 100g', batch: 'AB123', mfgDate: '2026-08', expiryDate: '2027-02-14' })] });
+  await sync(app, owner.token, { ops: [{ id: opId(), type: 'product.update', at: T0, productId: 'P1', patch: { batch: 'M9', mfgDate: '2026-11-10', expiryDate: '2026-11-13' } }] });
+  const bad = await sync(app, owner.token, { ops: [{ id: opId(), type: 'product.update', at: T0, productId: 'P1', patch: { expiryDate: 'next week' } }] });
+  const res = await sync(app, owner.token);
+
+  const byId = Object.fromEntries(res.changes.products.map((p) => [p.id, p]));
+  assert.deepEqual([byId.P7.batch, byId.P7.mfgDate, byId.P7.expiryDate], ['AB123', '2026-08', '2027-02-14']);
+  assert.deepEqual([byId.P1.batch, byId.P1.mfgDate, byId.P1.expiryDate], ['M9', '2026-11-10', '2026-11-13']);
+  assert.match(bad.rejected[0].reason, /^invalid/);
 });

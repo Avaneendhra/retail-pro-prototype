@@ -13,6 +13,8 @@ const Id = z.string().min(1).max(80).regex(/^[\w.:-]+$/);
 const Time = z.number().int().min(0).max(8.64e15);
 const Count = z.number().int().min(-1e9).max(1e9);
 const Money = z.number().min(0).max(1e12);
+// A date as printed on a pack: month ("2026-08") or day ("2026-08-15"), or empty when unknown.
+const DateText = z.string().regex(/^(\d{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/, 'Use YYYY-MM or YYYY-MM-DD.');
 const Names = z.record(z.string().max(8), z.string().max(160));
 const Aliases = z.array(z.string().max(80)).max(40);
 
@@ -27,6 +29,9 @@ const productFields = {
   min: Count,
   coverDays: z.number().int().min(0).max(365),
   needsReview: z.boolean(),
+  batch: z.string().trim().max(40),
+  mfgDate: DateText,
+  expiryDate: DateText,
 };
 
 const Product = z.object({
@@ -42,6 +47,9 @@ const Product = z.object({
   coverDays: productFields.coverDays.default(7),
   quantity: Count.default(0),
   needsReview: z.boolean().default(false),
+  batch: productFields.batch.default(''),
+  mfgDate: DateText.default(''),
+  expiryDate: DateText.default(''),
   createdAt: Time.optional(),
 });
 
@@ -64,6 +72,7 @@ const Bill = z.object({
   total: Money,
   payment: z.object({ method: z.string().min(1).max(20), received: z.number().nullish() }),
   items: z.array(BillItem).min(1).max(200),
+  discount: Money.optional(),
   seed: z.boolean().optional(),
 });
 
@@ -173,20 +182,20 @@ function insertRows(ctx, table, columns, rows, fixed = [], extraArgs = []) {
 
 const productStatement = (ctx, products) => insertRows(
   ctx, 'products',
-  ['id', 'code', 'barcode', 'name', 'names', 'aliases', 'category', 'price', 'min_qty', 'cover_days', 'quantity', 'needs_review', 'created_at'],
+  ['id', 'code', 'barcode', 'name', 'names', 'aliases', 'category', 'price', 'min_qty', 'cover_days', 'quantity', 'needs_review', 'created_at', 'batch', 'mfg_date', 'expiry_date'],
   products.map((p) => ({
     id: p.id, code: p.code, barcode: p.barcode, name: p.name, names: JSON.stringify(p.names), aliases: JSON.stringify(p.aliases),
     category: p.category, price: p.price, min_qty: p.min, cover_days: p.coverDays, quantity: p.quantity,
-    needs_review: p.needsReview ? 1 : 0, created_at: p.createdAt ?? ctx.now,
+    needs_review: p.needsReview ? 1 : 0, created_at: p.createdAt ?? ctx.now, batch: p.batch, mfg_date: p.mfgDate, expiry_date: p.expiryDate,
   })),
   [['created_by', '?4']], [ctx.userId],
 );
 
 const billStatement = (ctx, bills) => insertRows(
   ctx, 'bills',
-  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed'],
+  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed', 'discount'],
   bills.map((b) => ({
-    id: b.id, bill_no: b.billNo, at: b.at, total: b.total, payment: JSON.stringify(b.payment), items: JSON.stringify(b.items), seed: b.seed ? 1 : 0,
+    id: b.id, bill_no: b.billNo, at: b.at, total: b.total, payment: JSON.stringify(b.payment), items: JSON.stringify(b.items), seed: b.seed ? 1 : 0, discount: b.discount || 0,
   })),
   [['user_id', '?4'], ['device_no', '(SELECT device_no FROM devices WHERE shop_id = ?1 AND id = ?5)']], [ctx.userId, ctx.deviceId],
 );
@@ -243,6 +252,7 @@ const flag = (value) => (value ? 1 : 0);
 const PRODUCT_COLUMNS = [
   ['name', 'name'], ['names', 'names', json], ['aliases', 'aliases', json], ['code', 'code'], ['barcode', 'barcode'],
   ['category', 'category'], ['price', 'price'], ['min', 'min_qty'], ['coverDays', 'cover_days'], ['needsReview', 'needs_review', flag],
+  ['batch', 'batch'], ['mfgDate', 'mfg_date'], ['expiryDate', 'expiry_date'],
 ];
 const PO_COLUMNS = [['supplier', 'supplier'], ['status', 'status'], ['items', 'items', json]];
 const PO_OPEN = "status <> 'received' AND deleted = 0";

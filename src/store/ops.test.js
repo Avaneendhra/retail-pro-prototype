@@ -89,7 +89,7 @@ it('product.create adds a product with defaults; an id that exists is kept', () 
   const same = applyOp(added, { id: 'op-2', type: 'product.create', at: T, product: { id: 'P1', name: 'Other', quantity: 999 } });
 
   expect(added.products[2]).toEqual({
-    id: 'P3', code: '', barcode: '', name: 'Soap', names: {}, aliases: [], category: 'other', price: 0, min: 0, coverDays: 7, quantity: 12, needsReview: false, createdAt: T + 5,
+    id: 'P3', code: '', barcode: '', name: 'Soap', names: {}, aliases: [], category: 'other', price: 0, min: 0, coverDays: 7, quantity: 12, needsReview: false, createdAt: T + 5, batch: '', mfgDate: '', expiryDate: '',
   });
   expect(same).toBe(added);
 });

@@ -40,8 +40,8 @@ it('old sr2 keys become a dataset: products kept, bills kept, history lines grou
   const dataset = readLegacy(fakeStorage(OLD));
 
   expect(dataset.data.products).toEqual([
-    { id: 'P1001', code: 'ML', barcode: '8901262010016', name: 'Milk 500ml', names: { te: 'పాలు 500ml' }, aliases: ['milk'], category: 'dairy', price: 30, quantity: 37, min: 20, coverDays: 2, needsReview: false, createdAt: at(1, 9) },
-    { id: 'P1017', code: 'SOA', barcode: 'P1017', name: 'Soap', names: {}, aliases: [], category: 'other', price: 25, quantity: 4, min: 5, coverDays: 7, needsReview: true, createdAt: at(10, 9) },
+    { id: 'P1001', code: 'ML', barcode: '8901262010016', name: 'Milk 500ml', names: { te: 'పాలు 500ml' }, aliases: ['milk'], category: 'dairy', price: 30, quantity: 37, min: 20, coverDays: 2, needsReview: false, createdAt: at(1, 9), batch: '', mfgDate: '', expiryDate: '' },
+    { id: 'P1017', code: 'SOA', barcode: 'P1017', name: 'Soap', names: {}, aliases: [], category: 'other', price: 25, quantity: 4, min: 5, coverDays: 7, needsReview: true, createdAt: at(10, 9), batch: '', mfgDate: '', expiryDate: '' },
   ]);
   expect(dataset.data.bills.map((b) => [b.id, b.billNo, b.at, b.total, Boolean(b.seed)])).toEqual([
     ['B1025', '1025', at(16, 9), 90, false],

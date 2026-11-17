@@ -14,8 +14,9 @@ prepareZXingModule({
   overrides: { locateFile: (path, prefix) => (path.endsWith('.wasm') ? wasmUrl : prefix + path) },
 });
 
-const ZX_FORMATS = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'Code128', 'Code39', 'QRCode', 'DataMatrix'];
-const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code', 'data_matrix'];
+// Retail codes first; GS1 DataBar / DataMatrix / QR also carry batch, dates and price.
+const ZX_FORMATS = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'Code128', 'Code39', 'ITF14', 'DataBar', 'DataBarExp', 'DataBarLtd', 'QRCode', 'DataMatrix'];
+const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'qr_code', 'data_matrix'];
 
 let nativeDetector; // undefined = not checked yet, null = unavailable
 async function getNativeDetector() {

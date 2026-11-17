@@ -6,7 +6,9 @@ import { useToast } from '../../context/ToastContext';
 import { inr, pname } from '../../lib/format';
 import { CATEGORIES } from '../../data/seed';
 import Modal from '../common/Modal';
+import PageHeader from '../layout/PageHeader';
 import { LANGUAGES } from '../../i18n';
+import { expiryInfo, dateInputText } from '../../lib/expiry';
 
 export const TrendMark = ({ trend }) => {
   const { t } = useTranslation();
@@ -19,6 +21,16 @@ export const StatusBadge = ({ status }) => {
   const { t } = useTranslation();
   const cls = status === 'out' ? 'badge-danger' : status === 'low' ? 'badge-warning' : 'badge-success';
   return <span className={`badge ${cls}`}>{t(`status.${status}`)}</span>;
+};
+
+/** "Expired" or "Expires in 5 days", only when it needs attention. */
+export const ExpiryBadge = ({ product }) => {
+  const { t } = useTranslation();
+  const info = expiryInfo(product.expiryDate);
+  if (!info || info.status === 'ok') return null;
+  return info.status === 'expired'
+    ? <span className="badge badge-danger">{t('inventory.expired')}</span>
+    : <span className="badge badge-warning">{t('inventory.expiresIn', { count: info.days })}</span>;
 };
 
 export const Spark = ({ series }) => {
@@ -110,6 +122,52 @@ function EditModal({ product, onClose }) {
   );
 }
 
+/** Everything about one product: the numbers, the advice, and what to do about it. */
+function ProductDetail({ p, s, onWhy, onPO, onEdit }) {
+  const { t } = useTranslation();
+  return (
+    <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-5 bg-[var(--surface-2)]">
+      <div>
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <h3 className="font-display text-[22px] font-bold tracking-tight">{pname(p)}</h3>
+          <StatusBadge status={s.status} />
+        </div>
+        <dl className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-5">
+          {[
+            [t('inventory.current'), p.quantity],
+            [t('inventory.minimum'), p.min],
+            [t('inventory.avgDaily'), s.avg7.toFixed(1)],
+            [t('inventory.trendLabel'), <TrendMark key="t" trend={s.trend} />],
+            [t('inventory.predicted'), t(`demand.${s.demand}`)],
+            ...(p.mfgDate ? [[t('addStock.mfgDate'), dateInputText(p.mfgDate)]] : []),
+            ...(p.expiryDate ? [[t('addStock.expiryDate'), <span key="e" className="inline-flex items-center gap-2">{dateInputText(p.expiryDate)}<ExpiryBadge product={p} /></span>]] : []),
+            ...(p.batch ? [[t('addStock.batch'), p.batch]] : []),
+          ].map(([k, v], i) => (
+            <div key={i}><dt className="eyebrow text-[10px] mb-1.5">{k}</dt><dd className="font-semibold text-[17px]">{v}</dd></div>
+          ))}
+        </dl>
+        <div className="card p-5">
+          <p className="eyebrow mb-2">{t('inventory.recommendation')}</p>
+          <p className="text-[17px] font-medium leading-snug">{recommendationText(t, p, s)}</p>
+          {s.recommendedQty > 0 && (
+            <p className="mt-3 text-[var(--text-secondary)]">{t('inventory.recommendedOrder')}: <b className="text-[var(--text-primary)] font-mono">{s.recommendedQty} {t('common.units')}</b></p>
+          )}
+          <div className="flex flex-wrap gap-2 mt-5">
+            <button className="btn btn-secondary btn-sm" onClick={onWhy}>{t('inventory.viewRec')}</button>
+            <button className="btn btn-primary btn-sm" onClick={onPO}>{t('inventory.createPO')}</button>
+            <button className="btn btn-ghost btn-sm" onClick={onEdit}>{t('common.edit')}</button>
+          </div>
+        </div>
+      </div>
+      <div className="card p-5 self-start">
+        <p className="eyebrow mb-3">{t('inventory.last14')}</p>
+        <Spark series={s.series} />
+        <p className="text-xs text-[var(--text-muted)] mt-3">{inr(p.price)} · {p.barcode}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Inventory() {
   const { t } = useTranslation();
   const { products, stats, totalInventoryValue, createPO } = useInventory();
@@ -125,7 +183,7 @@ export default function Inventory() {
 
   useEffect(() => {
     const f = params.get('focus');
-    if (f) { setOpen(f); setTimeout(() => document.getElementById(`row-${f}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 100); }
+    if (f) { setOpen(f); setTimeout(() => (document.getElementById(`row-${f}`)?.offsetParent ? document.getElementById(`row-${f}`) : document.getElementById(`card-${f}`))?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 100); }
   }, [params]);
 
   const attentionScore = (p) => {
@@ -154,21 +212,13 @@ export default function Inventory() {
 
   return (
     <div>
-      <div className="page-header flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-        <div>
-          <h1 className="page-title">{t('inventory.title')}</h1>
-          <p className="page-subtitle">{t('inventory.subtitle')}</p>
-        </div>
-        <div className="flex flex-wrap items-stretch gap-3">
-          <div className="card card-accent-blue px-5 sm:px-6 py-4 flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-start">
-            <div><p className="eyebrow text-[10px]">{t('inventory.totalProducts')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{products.length}</p></div>
-            <div className="w-px self-stretch bg-black/10" />
-            <div><p className="eyebrow text-[10px]">{t('inventory.stockValue')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{inr(totalInventoryValue)}</p></div>
-            <div className="w-px self-stretch bg-black/10" />
-            <div><p className="eyebrow text-[10px]">{t('inventory.needAttention')}</p><p className="metric text-[20px] sm:text-[26px] mt-1">{attention}</p></div>
-          </div>
-          <Link to="/add-stock" className="btn btn-ghost self-center w-full sm:w-auto">+ {t('inventory.addStock')}</Link>
-        </div>
+      <PageHeader title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
+        <Link to="/add-stock" className="btn btn-cta">+ {t('inventory.addStock')}</Link>
+      </PageHeader>
+      <div className="stat-row">
+        <div className="stat"><p className="stat-label">{t('inventory.totalProducts')}</p><p className="stat-value">{products.length}</p></div>
+        <div className="stat"><p className="stat-label">{t('inventory.stockValue')}</p><p className="stat-value">{inr(totalInventoryValue)}</p></div>
+        <div className="stat"><p className="stat-label">{t('inventory.needAttention')}</p><p className={`stat-value ${attention ? 'text-[var(--warning)]' : ''}`}>{attention}</p></div>
       </div>
 
       <div className="card overflow-hidden">
@@ -188,7 +238,25 @@ export default function Inventory() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <ul className="inv-cards">
+          {list.length === 0 && <li className="p-8 text-center text-[var(--text-muted)]">{t('inventory.none')}</li>}
+          {list.map(p => {
+            const s = stats[p.id];
+            const isOpen = open === p.id;
+            return (
+              <li key={p.id} id={`card-${p.id}`} className="inv-card">
+                <button className="inv-card-button" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
+                  <span className="font-medium truncate flex items-center gap-2">{pname(p)}<ExpiryBadge product={p} /></span>
+                  <span className={`inv-card-stock ${s.status === 'out' ? 'text-[var(--danger)]' : s.status === 'low' ? 'text-[var(--warning)]' : ''}`}>{p.quantity}<span className="text-xs font-normal text-[var(--text-muted)]"> / {p.min}</span></span>
+                  <span className="inv-card-sub truncate">{p.code} · {t(`cat.${p.category}`)}{p.needsReview ? ` · ${t('inventory.needsReview')}` : ''}</span>
+                  <span className="inv-card-sub text-right">{s.recommendedQty > 0 ? `${t('inventory.recommendedOrder')} +${s.recommendedQty}` : t(`status.${s.status}`)}</span>
+                </button>
+                {isOpen && <ProductDetail p={p} s={s} onWhy={() => setWhy(p.id)} onPO={() => makePO(p)} onEdit={() => setEditing(p.id)} />}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="overflow-x-auto inv-table">
           <table className="table">
             <thead>
               <tr>
@@ -210,7 +278,7 @@ export default function Inventory() {
                   <React.Fragment key={p.id}>
                     <tr id={`row-${p.id}`} className="cursor-pointer" onClick={() => setOpen(isOpen ? null : p.id)} aria-expanded={isOpen}>
                       <td>
-                        <p className="font-medium flex items-center gap-2">{pname(p)}{p.needsReview && <span className="badge badge-warning">{t('inventory.needsReview')}</span>}</p>
+                        <p className="font-medium flex items-center gap-2">{pname(p)}{p.needsReview && <span className="badge badge-warning">{t('inventory.needsReview')}</span>}<ExpiryBadge product={p} /></p>
                         <p className="text-xs font-mono text-[var(--text-muted)] mt-0.5">{p.code} · {p.id} · {t(`cat.${p.category}`)}</p>
                       </td>
                       <td>
@@ -231,42 +299,7 @@ export default function Inventory() {
                     {isOpen && (
                       <tr className="detail-row">
                         <td colSpan={7} className="!whitespace-normal !p-0">
-                          <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6 bg-[var(--surface-2)]">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-3 mb-5">
-                                <h3 className="font-display text-[22px] font-bold tracking-tight">{pname(p)}</h3>
-                                <StatusBadge status={s.status} />
-                              </div>
-                              <dl className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
-                                {[
-                                  [t('inventory.current'), p.quantity],
-                                  [t('inventory.minimum'), p.min],
-                                  [t('inventory.avgDaily'), s.avg7.toFixed(1)],
-                                  [t('inventory.trendLabel'), <TrendMark key="t" trend={s.trend} />],
-                                  [t('inventory.predicted'), t(`demand.${s.demand}`)],
-                                ].map(([k, v], i) => (
-                                  <div key={i}><dt className="eyebrow text-[10px] mb-1.5">{k}</dt><dd className="font-semibold text-[17px]">{v}</dd></div>
-                                ))}
-                              </dl>
-                              <div className="card p-5">
-                                <p className="eyebrow mb-2">{t('inventory.recommendation')}</p>
-                                <p className="text-[17px] font-medium leading-snug">{recommendationText(t, p, s)}</p>
-                                {s.recommendedQty > 0 && (
-                                  <p className="mt-3 text-[var(--text-secondary)]">{t('inventory.recommendedOrder')}: <b className="text-[var(--text-primary)] font-mono">{s.recommendedQty} {t('common.units')}</b></p>
-                                )}
-                                <div className="flex flex-wrap gap-2 mt-5">
-                                  <button className="btn btn-secondary btn-sm" onClick={() => setWhy(p.id)}>{t('inventory.viewRec')}</button>
-                                  <button className="btn btn-primary btn-sm" onClick={() => makePO(p)}>{t('inventory.createPO')}</button>
-                                  <button className="btn btn-ghost btn-sm" onClick={() => setEditing(p.id)}>{t('common.edit')}</button>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="card p-5 self-start">
-                              <p className="eyebrow mb-3">{t('inventory.last14')}</p>
-                              <Spark series={s.series} />
-                              <p className="text-xs text-[var(--text-muted)] mt-3">{inr(p.price)} · {p.barcode}</p>
-                            </div>
-                          </div>
+                          <ProductDetail p={p} s={s} onWhy={() => setWhy(p.id)} onPO={() => makePO(p)} onEdit={() => setEditing(p.id)} />
                         </td>
                       </tr>
                     )}

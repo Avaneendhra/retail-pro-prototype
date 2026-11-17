@@ -23,6 +23,19 @@ const CHECK_EVERY_MS = 20_000;
 const text = (value, max) => String(value ?? '').trim().slice(0, max);
 const whole = (value, min = 0) => Math.max(min, Math.round(Number(value) || 0));
 const money = (value) => Math.max(0, Number(value) || 0);
+/** A pack date as the server accepts it ("2026-08" or "2026-08-15", a real date), else ''. */
+export function packDate(value) {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(String(value ?? '').trim());
+  if (!m) return '';
+  const [year, month, day] = [Number(m[1]), Number(m[2]), m[3] && Number(m[3])];
+  if (month < 1 || month > 12) return '';
+  if (day !== undefined && (day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate())) return '';
+  return m[0];
+}
+const packDetails = (d = {}) => {
+  const out = { batch: text(d.batch, 40), mfgDate: packDate(d.mfgDate), expiryDate: packDate(d.expiryDate) };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
+};
 const newId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const PRODUCT_FIELDS = {
@@ -36,6 +49,9 @@ const PRODUCT_FIELDS = {
   min: (v) => whole(v),
   coverDays: (v) => Math.min(365, whole(v)),
   needsReview: Boolean,
+  batch: (v) => text(v, 40),
+  mfgDate: packDate,
+  expiryDate: packDate,
 };
 
 function tidy(patch, fields) {
@@ -56,10 +72,14 @@ function useShop(engine, data, numbers, mode, showToast) {
 
   // The sample history is kept as one summary bill a day: it counts as sales but is not a bill to list.
   const bills = useMemo(() => data.bills.filter((b) => !b.seed), [data.bills]);
-  const sales = useMemo(() => data.bills.flatMap((b) => b.items.map((item, index) => ({
-    id: `${b.id}-${index}`, billId: b.seed ? null : b.id, productId: item.productId, productName: item.name,
-    qty: item.qty, price: item.price, total: item.total, date: b.at,
-  }))), [data.bills]);
+  // A discount is spread over the bill's lines, so sales figures add up to what was actually paid.
+  const sales = useMemo(() => data.bills.flatMap((b) => {
+    const share = b.discount ? b.total / Math.max(1, b.total + b.discount) : 1;
+    return b.items.map((item, index) => ({
+      id: `${b.id}-${index}`, billId: b.seed ? null : b.id, productId: item.productId, productName: item.name,
+      qty: item.qty, price: item.price, total: share === 1 ? item.total : Math.round(item.total * share * 100) / 100, date: b.at,
+    }));
+  }), [data.bills]);
 
   const stats = useMemo(() => computeStats(products, sales), [products, sales]);
   const lowStockProducts = useMemo(() => products.filter((p) => p.quantity <= (p.min ?? 0)), [products]);
@@ -86,8 +106,8 @@ function useShop(engine, data, numbers, mode, showToast) {
     }
   }, [showToast]);
 
-  /** Completes a sale. cart: [{ productId, qty }] */
-  const checkout = useCallback((cart, payment = { method: 'cash' }) => {
+  /** Completes a sale. cart: [{ productId, qty }]; `discount` is an amount in rupees taken off the total. */
+  const checkout = useCallback((cart, payment = { method: 'cash' }, { discount = 0 } = {}) => {
     const stock = current().products;
     const lines = [];
     for (const item of cart) {
@@ -100,9 +120,12 @@ function useShop(engine, data, numbers, mode, showToast) {
 
     const { n, code } = engine.takeNumber('bill');
     const items = lines.map(({ p, qty }) => ({ productId: p.id, name: p.name, names: p.names, code: p.code, qty, price: p.price, total: qty * p.price }));
+    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+    const off = Math.min(subtotal, Math.round(money(discount) * 100) / 100);
     const bill = {
       id: billId(code, n), billNo: billNo(code, n), at: Date.now(),
-      total: items.reduce((sum, item) => sum + item.total, 0),
+      total: Math.round((subtotal - off) * 100) / 100,
+      ...(off > 0 ? { discount: off } : {}),
       payment: { method: text(payment.method, 20) || 'cash', ...(Number(payment.received) > 0 ? { received: Number(payment.received) } : {}) },
       items,
     };
@@ -122,6 +145,7 @@ function useShop(engine, data, numbers, mode, showToast) {
     const created = [];
     const changes = [];
     const qtyById = new Map();
+    const detailsById = new Map(); // the batch and dates of the stock just received
     for (const item of items) {
       const qty = whole(item.qty);
       if (!qty) continue;
@@ -137,12 +161,14 @@ function useShop(engine, data, numbers, mode, showToast) {
           barcode: text(np.barcode, 64) || id,
           category: CATEGORIES.includes(np.category) ? np.category : 'other',
           price: money(np.price), quantity: qty, min: whole(np.min) || 5, coverDays: 7,
-          needsReview: Boolean(np.needsReview), createdAt: Date.now(),
+          needsReview: Boolean(np.needsReview), createdAt: Date.now(), ...packDetails(np),
         };
         created.push(product);
         changes.push({ productId: id, name, names: product.names, before: 0, after: qty, qty, isNew: true });
       } else {
         qtyById.set(item.productId, (qtyById.get(item.productId) || 0) + qty);
+        const details = packDetails(item.details);
+        if (Object.keys(details).length) detailsById.set(item.productId, { ...detailsById.get(item.productId), ...details });
       }
     }
     const lines = [];
@@ -159,6 +185,7 @@ function useShop(engine, data, numbers, mode, showToast) {
       units: changes.reduce((sum, ch) => sum + ch.qty, 0), count: changes.length, at: Date.now(),
     } : null;
     if (lines.length || record) engine.dispatch('stock.move', { reason, lines, ...(record ? { invoice: record } : {}) });
+    for (const [id, patch] of detailsById) if (stock.some((p) => p.id === id)) engine.dispatch('product.update', { productId: id, patch });
     return changes;
   }, [engine, current]);
 

@@ -286,3 +286,27 @@ it('a shop that cannot be opened says so instead of showing an empty one', async
   expect(await screen.findByText('The shop data could not be opened')).toBeInTheDocument();
   expect(screen.queryByText('the app')).toBe(null);
 });
+
+it('stock received with a batch and dates keeps them on the product', async () => {
+  await renderApp();
+
+  act(() => {
+    latest.inventory.receiveStock([
+      { productId: 'P1', qty: 10, details: { batch: 'M9', mfgDate: '2026-11-10', expiryDate: '2026-11-13' } },
+      { newProduct: { name: 'Amul Butter 100g', price: 58, batch: 'AB123', mfgDate: '2026-08', expiryDate: '2027-02' }, qty: 4 },
+    ], { reason: 'scan' });
+  });
+
+  expect(latest.inventory.products[0]).toMatchObject({ quantity: 50, batch: 'M9', mfgDate: '2026-11-10', expiryDate: '2026-11-13' });
+  expect(latest.inventory.products[1]).toMatchObject({ name: 'Amul Butter 100g', batch: 'AB123', mfgDate: '2026-08', expiryDate: '2027-02' });
+});
+
+it('dates that are not real dates are left out instead of breaking the sync', async () => {
+  await renderApp();
+
+  act(() => { latest.inventory.receiveStock([{ productId: 'P1', qty: 1, details: { mfgDate: '31/02/2026', expiryDate: '2027-02-30', batch: '  ' } }]); });
+
+  const [milk] = latest.inventory.products;
+  expect(milk.quantity).toBe(41);
+  expect([milk.batch || '', milk.mfgDate || '', milk.expiryDate || '']).toEqual(['', '', '']);
+});
