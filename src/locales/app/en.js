@@ -85,6 +85,7 @@ export default {
   },
 
   dashboard: {
+    liveFeed: "Live feed", liveFeedEmpty: "No sales yet today.",
     storeOpen: 'Store open', skus: '{{count}} products',
     heroTitle1: 'Billing', heroTitle2: 'that runs', heroTitle3: 'your stock.',
     heroSub: 'Every sale updates inventory instantly. Simple forecasts tell you what to reorder before it runs out.',

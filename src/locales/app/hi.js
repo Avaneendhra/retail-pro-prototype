@@ -85,6 +85,7 @@ export default {
   },
 
   dashboard: {
+    liveFeed: "लाइव फ़ीड", liveFeedEmpty: "आज अभी कोई बिक्री नहीं।",
     storeOpen: 'दुकान खुली है', skus: '{{count}} सामान',
     heroTitle1: 'बिलिंग से', heroTitle2: 'चलता है', heroTitle3: 'आपका स्टॉक।',
     heroSub: 'हर बिक्री स्टॉक को तुरंत अपडेट करती है। आसान अनुमान बताते हैं कि क्या खत्म होने से पहले ऑर्डर करना है।',
