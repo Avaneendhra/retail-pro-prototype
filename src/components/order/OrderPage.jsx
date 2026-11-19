@@ -5,6 +5,8 @@ import { inr } from '../../lib/format';
 import Logo from '../layout/Logo';
 
 const PREFIX = '#/order/';
+// The shop's Supabase functions, loaded only when the link says the shop uses them.
+const cloudApi = () => import('../../store/supabase').then(({ supabaseClient, createSupabaseApi }) => createSupabaseApi(supabaseClient()));
 const remember = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window */ } };
 const recall = (key) => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } };
 
@@ -50,9 +52,16 @@ export default function OrderPage() {
     });
   }, []);
 
-  // With the shop's server running, today's items and prices replace the ones in the link.
+  // With the shop signed in (Supabase or its own server), today's items and prices replace the ones in the link.
   useEffect(() => {
-    if (!order?.api || !order.sid) return;
+    if (!order?.sid) return;
+    if (order.sb) {
+      cloudApi().then((api) => api.publicMenu(order.sid, order.code || ''))
+        .then((menu) => { if (menu?.items?.length) setItems(menu.items); })
+        .catch(() => {});
+      return;
+    }
+    if (!order.api) return;
     fetch(`${order.api}/api/public/menu?shop=${encodeURIComponent(order.sid)}&code=${encodeURIComponent(order.code || '')}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((menu) => { if (menu?.items?.length) setItems(menu.items); })
@@ -96,12 +105,15 @@ export default function OrderPage() {
     setSending(true);
     remember(`stokd_order_${order.sid || order.shop}`, { name: form.name.trim(), address: form.address.trim() });
     let inApp = null;
-    if (order.api && order.sid) {
-      inApp = await postJson(`${order.api}/api/public/orders`, {
-        shop: order.sid, code: order.code || '', name: form.name.trim(), address: form.address.trim(), note: form.note.trim(),
-        items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
-        ...(location ? { location } : {}),
-      });
+    const body = {
+      shop: order.sid, code: order.code || '', name: form.name.trim(), address: form.address.trim(), note: form.note.trim(),
+      items: lines.map((l) => ({ productId: l.productId, qty: l.qty })),
+      ...(location ? { location } : {}),
+    };
+    if (order.sb && order.sid) {
+      inApp = await cloudApi().then((api) => api.publicOrder(body)).then((r) => Boolean(r?.ok), () => false);
+    } else if (order.api && order.sid) {
+      inApp = await postJson(`${order.api}/api/public/orders`, body);
     }
     const message = orderMessage({
       shop: order.shop, name: form.name.trim(), code: order.code, lines,

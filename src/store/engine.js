@@ -461,11 +461,8 @@ export function createEngine({
     syncNow();
   }
 
-  async function signUp({ shopName, name, login, password, keepDeviceData = false }) {
-    const cleaned = cleanLogin(login);
-    const authKey = await deriveKey(cleaned, password);
-    const res = await api.signup({ shopName, name, login: cleaned, authKey, deviceId, deviceName });
-
+  /** Opens a shop that was just created, bringing this device's own data into it when asked. */
+  async function enterNewShop(res, keepDeviceData) {
     await settled();
     const local = keepDeviceData ? (mode === 'local' ? dataset : await storage.load('local')) : null;
     const fresh = emptyDataset({ counters: local ? local.counters : undefined });
@@ -476,7 +473,39 @@ export function createEngine({
     // The device's own data now belongs to the shop. Keeping a second, ageing copy
     // for "no account" mode would only be mistaken for the real thing later.
     if (local && saveError === null) await storage.drop('local').catch(() => {});
+  }
+
+  async function signUp({ shopName, name, login, password, keepDeviceData = false }) {
+    const cleaned = cleanLogin(login);
+    const authKey = await deriveKey(cleaned, password);
+    const res = await api.signup({ shopName, name, login: cleaned, authKey, deviceId, deviceName });
+    await enterNewShop(res, keepDeviceData);
     return { recoveryCode: res.recoveryCode };
+  }
+
+  /* ── Supabase: the person is already signed in; open their shop ── */
+
+  /** Opens the signed-in person's shop, or answers { needsShop: true } when they have none yet. */
+  async function continueCloud() {
+    const res = await api.session({ deviceId, deviceName });
+    if (res.needsShop) return { needsShop: true, logins: res.logins || [] };
+    if (mode === 'account' && session?.shop?.id === res.shop.id) {
+      // Signing in again to the shop that is already open (after "please sign in again").
+      session = { ...session, user: res.user, shop: res.shop };
+      sessionStore.set(session);
+      setSync({ status: 'idle', error: null });
+      syncNow();
+      return { entered: true };
+    }
+    await enter({ token: 'supabase', ...res });
+    return { entered: true };
+  }
+
+  /** An owner's first sign-in: creates the shop, optionally with this device's products and bills. */
+  async function createCloudShop({ shopName, name, keepDeviceData = false }) {
+    const res = await api.createShop({ shopName, name, deviceId, deviceName });
+    await enterNewShop({ token: 'supabase', ...res }, keepDeviceData);
+    return { entered: true };
   }
 
   async function signInWithKey(login, authKey) {
@@ -561,5 +590,6 @@ export function createEngine({
     },
     dispatch, takeNumber, syncNow, tick, settled, retryRejected, discardRejected,
     signUp, signIn, recover, signOut, changePassword, team, checkServer, resetLocal,
+    continueCloud, createCloudShop, device: { id: deviceId, name: deviceName },
   };
 }

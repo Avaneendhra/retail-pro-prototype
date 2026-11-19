@@ -345,7 +345,7 @@ function useShop(engine, data, numbers, mode, showToast) {
   ]);
 }
 
-function Shop({ engine, children }) {
+function Shop({ engine, cloud = null, children }) {
   const { showToast } = useToast() || {};
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);
   const [apiAvailable, setApiAvailable] = useState(null);
@@ -372,14 +372,55 @@ function Shop({ engine, children }) {
     return ok;
   }, [engine]);
 
+  /* ── Supabase sign-in: once signed in, open the person's shop (or ask them to create one) ── */
+  const [pendingShop, setPendingShop] = useState(null); // { logins } while signed in without a shop
+  const modeRef = React.useRef(snapshot.mode);
+  modeRef.current = snapshot.mode;
+
+  const continueSignIn = useCallback(async () => {
+    const res = await engine.continueCloud();
+    setPendingShop(res.needsShop ? res : null);
+    return res;
+  }, [engine]);
+
+  const createShop = useCallback(async (details) => {
+    await engine.createCloudShop(details);
+    setPendingShop(null);
+  }, [engine]);
+
+  const signOutEverywhere = useCallback(async () => {
+    setPendingShop(null);
+    if (cloud) await cloud.auth.signOut();
+    await engine.signOut();
+  }, [engine, cloud]);
+
+  // Coming back from Google (or opening the app while signed in with Supabase) continues the sign-in.
+  useEffect(() => {
+    if (!cloud) return undefined;
+    let stop = () => {};
+    let alive = true;
+    const resume = () => {
+      if (modeRef.current === 'local') continueSignIn().catch(() => {});
+      else if (engine.getSnapshot().sync.status === 'auth') continueSignIn().catch(() => {});
+    };
+    cloud.auth.session().then((session) => { if (alive && session) resume(); }).catch(() => {});
+    cloud.auth.onChange((event) => { if (event === 'SIGNED_IN') resume(); }).then((unsubscribe) => {
+      if (alive) stop = unsubscribe; else unsubscribe();
+    }).catch(() => {});
+    return () => { alive = false; stop(); };
+  }, [cloud, engine, continueSignIn]);
+
   const account = useMemo(() => ({
     ready: snapshot.ready, mode: snapshot.mode, account: snapshot.account, sync: snapshot.sync,
     storage: snapshot.storage, saveError: snapshot.saveError,
-    apiAvailable: snapshot.mode === 'account' ? true : apiAvailable, checkServer,
-    signUp: engine.signUp, signIn: engine.signIn, recover: engine.recover, signOut: engine.signOut,
-    changePassword: engine.changePassword, syncNow: engine.syncNow, team: engine.team,
+    apiAvailable: cloud ? true : (snapshot.mode === 'account' ? true : apiAvailable), checkServer,
+    signUp: engine.signUp, signIn: engine.signIn, recover: engine.recover, signOut: signOutEverywhere,
+    changePassword: engine.changePassword, syncNow: engine.syncNow, team: cloud ? cloud.api.team : engine.team,
     retryRejected: engine.retryRejected, discardRejected: engine.discardRejected,
-  }), [snapshot.ready, snapshot.mode, snapshot.account, snapshot.sync, snapshot.storage, snapshot.saveError, apiAvailable, checkServer, engine]);
+    cloud: Boolean(cloud), auth: cloud?.auth || null, monthly: cloud?.api.monthly || null,
+    pendingShop, continueSignIn, createShop, cancelPending: signOutEverywhere,
+  }), [snapshot.ready, snapshot.mode, snapshot.account, snapshot.sync, snapshot.storage, snapshot.saveError, apiAvailable, checkServer, engine,
+    cloud, pendingShop, continueSignIn, createShop, signOutEverywhere]);
 
   if (!snapshot.ready) return <Splash />;
   return (
@@ -393,7 +434,7 @@ function Shop({ engine, children }) {
  * Starts the store and provides it to the screens.
  * Tests pass a ready-made `engine`, or their own `boot`.
  */
-export function InventoryProvider({ engine, boot = bootApp, children }) {
+export function InventoryProvider({ engine, cloud = null, boot = bootApp, children }) {
   const [started, setStarted] = useState(null);
 
   useEffect(() => {
@@ -407,7 +448,7 @@ export function InventoryProvider({ engine, boot = bootApp, children }) {
   }, [engine, boot]);
 
   const active = engine || started?.engine;
-  if (active) return <Shop engine={active}>{children}</Shop>;
+  if (active) return <Shop engine={active} cloud={engine ? cloud : started?.cloud}>{children}</Shop>;
   if (started?.blocked) return <AlreadyOpen />;
   if (started?.error) return <StartError error={started.error} />;
   return <Splash />;
