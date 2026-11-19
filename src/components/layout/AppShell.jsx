@@ -6,7 +6,7 @@ import { useInventory } from '../../context/InventoryContext';
 import { LANGUAGES } from '../../i18n';
 import { pname } from '../../lib/format';
 import {
-  SellIcon, BillsIcon, StatsIcon, StockIcon, AddIcon, InvoiceIcon, OrdersIcon, CustomersIcon,
+  SellIcon, BillsIcon, StatsIcon, StockIcon, AddIcon, InvoiceIcon, OrdersIcon, CustomersIcon, ReportsIcon,
   BellIcon, GearIcon, SunIcon, MoonIcon, GlobeIcon, MenuIcon, CloseIcon,
 } from '../../lib/icons';
 import SettingsModal from './SettingsModal';
@@ -20,6 +20,7 @@ const NAV = [
   { path: '/home', key: 'newSale', Icon: SellIcon },
   { path: '/bills', key: 'bills', Icon: BillsIcon },
   { path: '/dashboard', key: 'dashboard', Icon: StatsIcon },
+  { path: '/reports', key: 'reports', Icon: ReportsIcon },
   { path: '/inventory', key: 'inventory', Icon: StockIcon },
   { path: '/add-stock', key: 'addStock', Icon: AddIcon },
   { path: '/invoices', key: 'invoices', Icon: InvoiceIcon },

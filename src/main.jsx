@@ -39,6 +39,7 @@ const AddStock = lazyPage(() => import("./components/inventory/AddStock"));
 const SupplierInvoice = lazyPage(() => import("./components/invoice/SupplierInvoice"));
 const PurchaseOrders = lazyPage(() => import("./components/orders/PurchaseOrders"));
 const Customers = lazyPage(() => import("./components/customers/Customers"));
+const Reports = lazyPage(() => import("./components/reports/Reports"));
 
 function OrderLinkReload() {
   React.useEffect(() => { window.location.reload(); }, []);
@@ -59,6 +60,7 @@ const router = createHashRouter([
       { path: "/invoices", element: <SupplierInvoice /> },
       { path: "/orders", element: <PurchaseOrders /> },
       { path: "/customers", element: <Customers /> },
+      { path: "/reports", element: <Reports /> },
       // An order link opened in a tab where the shop app is already running: load it as its own page.
       { path: "/order/*", element: <OrderLinkReload /> },
       // old routes

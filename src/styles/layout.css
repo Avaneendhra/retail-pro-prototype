@@ -415,3 +415,19 @@
   .is-moving .live-feed-track, .live-feed-head .status-dot { animation: none; }
   .live-feed-window.is-moving { overflow-y: auto; }
 }
+
+/* ── Reports ── */
+.report-kpis { grid-template-columns: 1.4fr 1fr 1fr; }
+@media (max-width: 767px) { .report-kpis { grid-template-columns: 1fr; } }
+.report-bars { display: flex; align-items: stretch; gap: 4px; }
+.report-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.report-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.report-bar { width: 100%; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--primary) 38%, transparent); }
+.report-bar.is-top { background: var(--primary); }
+.report-bar-col span { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; max-width: 100%; }
+.report-stack { display: flex; height: 14px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--surface-2); }
+.report-stack span, .report-swatch { display: block; }
+.report-swatch { width: 12px; height: 12px; border-radius: 4px; }
+.is-cash { background: var(--primary); }
+.is-upi { background: var(--accent-pink); }
+.is-card { background: var(--warning); }

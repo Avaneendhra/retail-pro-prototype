@@ -161,7 +161,7 @@ export default function Customers() {
       v: 1, shop: shopName, phone: shop.phone, name: c.name, code: c.code,
       items: menuForLink(products, stats),
       ...(shop.location ? { loc: shop.location, radius: shop.radiusKm || 2 } : {}),
-      ...(account?.account?.shop?.id ? { api: apiAddress(), sid: account.account.shop.id } : {}),
+      ...(account?.account?.shop?.id ? (account.cloud ? { sb: 1, sid: account.account.shop.id } : { api: apiAddress(), sid: account.account.shop.id }) : {}),
     };
     return orderPageUrl(appAddress(), await encodeOrder(order));
   };

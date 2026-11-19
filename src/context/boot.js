@@ -5,6 +5,7 @@ import { createApi } from '../store/api';
 import { createEngine } from '../store/engine';
 import { clearLegacy, readLegacy } from '../store/legacy';
 import { openStorage } from '../store/storage';
+import { createSupabaseApi, createSupabaseAuth, supabaseClient } from '../store/supabase';
 import { seedDataset } from '../data/seed';
 
 const SESSION_KEY = 'stokd_session';
@@ -60,9 +61,10 @@ function describeDevice(nav) {
 
 /**
  * Returns `boot()`: the first call starts everything, later calls get the same promise.
- * Resolves to `{ engine }`, or `{ blocked: true }` when the app is already open in another tab.
+ * Resolves to `{ engine, cloud }` (cloud: Supabase sign-in and functions, or null), or `{ blocked: true }`
+ * when the app is already open in another tab.
  */
-export function createBoot({ apiUrl = '', env = globalThis } = {}) {
+export function createBoot({ apiUrl = '', env = globalThis, cloud: useCloud = !apiUrl } = {}) {
   let started = null;
 
   async function run() {
@@ -73,9 +75,12 @@ export function createBoot({ apiUrl = '', env = globalThis } = {}) {
     // Ask the browser not to clear the shop's data when the device runs low on space.
     attempt(() => env.navigator?.storage?.persist?.()?.catch?.(() => {}));
 
+    // Supabase is the server unless the app is built against our own API (VITE_API_URL).
+    const client = useCloud ? supabaseClient() : null;
+    const api = useCloud ? createSupabaseApi(client) : createApi(apiUrl);
     const engine = createEngine({
       storage,
-      api: createApi(apiUrl),
+      api,
       sessionStore: sessionStoreOn(ls),
       deviceId: deviceIdOn(ls),
       deviceName: describeDevice(env.navigator),
@@ -84,7 +89,7 @@ export function createBoot({ apiUrl = '', env = globalThis } = {}) {
       legacy: { read: () => readLegacy(ls), clear: () => clearLegacy(ls) },
     });
     await engine.start();
-    return { engine };
+    return { engine, cloud: useCloud ? { api, auth: createSupabaseAuth(client) } : null };
   }
 
   return () => (started ??= run());

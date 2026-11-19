@@ -6,6 +6,7 @@ import { deviceCode } from '../../store/ids';
 import { fmtDate, fmtTime } from '../../lib/format';
 import Modal from '../common/Modal';
 import { syncLabel } from './syncLabel';
+import { CloudSignIn, CreateShop, CloudTeam, CloudPassword } from './CloudAccount';
 
 const MIN_PASSWORD = 8;
 const KNOWN_ERRORS = ['network', 'bad_credentials', 'login_taken', 'too_many_attempts', 'signup_closed', 'invalid_login', 'short_password', 'insecure_context', 'team_full', 'forbidden', 'bad_code'];
@@ -275,7 +276,7 @@ function ChangePassword() {
 
 function SignedIn() {
   const { t } = useTranslation();
-  const { account, sync, syncNow, signOut, retryRejected, discardRejected } = useAccount();
+  const { account, sync, syncNow, signOut, retryRejected, discardRejected, cloud } = useAccount();
   const { user, shop, device } = account;
 
   const leave = () => {
@@ -327,9 +328,9 @@ function SignedIn() {
         )}
       </section>
 
-      {sync.status === 'auth' && <SignInForm />}
-      {user.role === 'owner' && sync.status !== 'auth' && <Team />}
-      {sync.status !== 'auth' && <ChangePassword />}
+      {sync.status === 'auth' && (cloud ? <CloudSignIn intro={false} /> : <SignInForm />)}
+      {user.role === 'owner' && sync.status !== 'auth' && (cloud ? <CloudTeam /> : <Team />)}
+      {sync.status !== 'auth' && (cloud ? <CloudPassword /> : <ChangePassword />)}
 
       <button className="btn btn-sm text-[var(--danger)]" onClick={leave}>{t('account.signOut')}</button>
     </div>
@@ -364,14 +365,19 @@ function RecoveryCode({ code, onDone }) {
 
 export default function AccountModal({ open, onClose }) {
   const { t } = useTranslation();
-  const { mode } = useAccount();
+  const { mode, cloud, pendingShop } = useAccount();
   const [recoveryCode, setRecoveryCode] = useState(null);
 
   if (recoveryCode) return <RecoveryCode code={recoveryCode} onDone={() => { setRecoveryCode(null); onClose(); }} />;
   if (!open) return null;
+  const title = mode === 'account' ? t('account.title') : pendingShop ? t('account.cloud.createTitle') : t('account.localTitle');
+  let body;
+  if (mode === 'account') body = <SignedIn />;
+  else if (!cloud) body = <SignedOut onRecoveryCode={setRecoveryCode} />;
+  else body = pendingShop ? <CreateShop /> : <CloudSignIn />;
   return (
-    <Modal open onClose={onClose} title={mode === 'account' ? t('account.title') : t('account.localTitle')} width={560}>
-      {mode === 'account' ? <SignedIn /> : <SignedOut onRecoveryCode={setRecoveryCode} />}
+    <Modal open onClose={onClose} title={title} width={560}>
+      {body}
     </Modal>
   );
 }
