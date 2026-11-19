@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { businessSummary, startOfDay, weekdayPatterns } from '../../lib/insights';
 import { loadProductList } from '../../lib/productList';
 import InsightRow from './InsightRow';
+import LiveFeed from './LiveFeed';
 import { inr, pname, weekdayShort, fmtTime, fmtDate } from '../../lib/format';
 import PageHeader from '../layout/PageHeader';
 import { expiryInfo } from '../../lib/expiry';
@@ -103,6 +104,7 @@ export default function Dashboard() {
           <span className="kpi-label">{t('dashboard.today')}</span>
           <span className="kpi-value">{inr(today.revenue)}</span>
           {delta !== null && <span className={`kpi-sub font-semibold ${delta >= 0 ? '!text-[var(--success)]' : '!text-[var(--danger)]'}`}>{t('dashboard.vsYesterday', { pct: pct(delta) })}</span>}
+          <LiveFeed sales={sales} products={products} />
         </div>
         <div className="kpi">
           <span className="kpi-label">{t('dash.billsLabel')}</span>

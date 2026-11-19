@@ -393,3 +393,25 @@
   background: var(--surface); border-top: 1px solid var(--border);
 }
 .order-foot-inner { max-width: 528px; margin: 0 auto; }
+
+/* ── Dashboard: live feed of what sold today, inside the Today card ── */
+.live-feed { margin-top: auto; padding-top: 14px; min-width: 0; }
+.live-feed-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.live-feed-head .status-dot { width: 7px; height: 7px; animation: live-dot 1.8s ease-in-out infinite; }
+@keyframes live-dot { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--success) 0%, transparent); } }
+.live-feed-window { height: 96px; overflow: hidden; }
+.live-feed-window.is-moving { -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
+.live-feed-window:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+.live-feed-track { list-style: none; margin: 0; padding: 0; }
+.is-moving .live-feed-track { animation: live-feed calc(var(--n) * 2.4s) linear infinite; }
+.is-moving:hover .live-feed-track, .is-moving:focus .live-feed-track { animation-play-state: paused; }
+@keyframes live-feed { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+.live-feed-track li { display: flex; justify-content: space-between; gap: 10px; height: 24px; align-items: center; font-size: 14px; white-space: nowrap; }
+.live-feed-name { overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.live-feed-qty { color: var(--text-muted); }
+.live-feed-amount { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
+.live-feed-empty { font-size: 14px; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .is-moving .live-feed-track, .live-feed-head .status-dot { animation: none; }
+  .live-feed-window.is-moving { overflow-y: auto; }
+}
