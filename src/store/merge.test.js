@@ -65,3 +65,18 @@ it('pruneBills drops bills older than the cut-off and keeps the rest untouched',
   expect(ids(pruneBills(data, T - DAY).bills)).toEqual(['B2']);
   expect(pruneBills(data, T - 10 * DAY)).toBe(data);
 });
+
+it('customers and delivery orders from the server are merged too, also into data saved before they existed', () => {
+  const { customers, orders, ...old } = emptyData();
+  const changes = {
+    ...NONE,
+    customers: [{ id: 'C1', name: 'Ravi', createdAt: T }, { id: 'C2', name: 'Sita', createdAt: T + 1 }],
+    orders: [{ id: 'O1', status: 'new', at: T }, { id: 'O2', status: 'new', at: T + DAY }],
+  };
+
+  const merged = mergeChanges(old, changes);
+
+  expect(ids(merged.customers)).toEqual(['C2', 'C1']);
+  expect(ids(merged.orders)).toEqual(['O2', 'O1']);
+  expect(ids(mergeChanges(merged, { ...NONE, customers: [{ id: 'C1', deleted: true }] }).customers)).toEqual(['C2']);
+});

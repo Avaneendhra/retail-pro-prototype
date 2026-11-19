@@ -8,6 +8,7 @@ import { CATEGORIES } from '../data/seed';
 import i18n from '../i18n';
 import { pname } from '../lib/format';
 import { computeStats } from '../lib/insights';
+import { newCustomerCode, normalizePhone } from '../lib/customers';
 import { billId, billNo, poId, poNo, productId } from '../store/ids';
 import { AlreadyOpen, Splash, StartError } from '../components/layout/StartScreens';
 
@@ -64,6 +65,14 @@ function tidy(patch, fields) {
   return out;
 }
 
+/** The customer written on a bill: a valid phone number, and a name when there is one. */
+const customerOf = (c) => {
+  const phone = normalizePhone(c?.phone);
+  if (!phone) return null;
+  const name = text(c.name, 80);
+  return name ? { phone, name } : { phone };
+};
+
 const orderItems = (items) => (items || []).slice(0, 200).map((i) => ({ productId: i.productId, qty: whole(i.qty, 1) }));
 
 function useShop(engine, data, numbers, mode, showToast) {
@@ -107,7 +116,7 @@ function useShop(engine, data, numbers, mode, showToast) {
   }, [showToast]);
 
   /** Completes a sale. cart: [{ productId, qty }]; `discount` is an amount in rupees taken off the total. */
-  const checkout = useCallback((cart, payment = { method: 'cash' }, { discount = 0 } = {}) => {
+  const checkout = useCallback((cart, payment = { method: 'cash' }, { discount = 0, customer = null } = {}) => {
     const stock = current().products;
     const lines = [];
     for (const item of cart) {
@@ -126,6 +135,7 @@ function useShop(engine, data, numbers, mode, showToast) {
       id: billId(code, n), billNo: billNo(code, n), at: Date.now(),
       total: Math.round((subtotal - off) * 100) / 100,
       ...(off > 0 ? { discount: off } : {}),
+      ...(customerOf(customer) ? { customer: customerOf(customer) } : {}),
       payment: { method: text(payment.method, 20) || 'cash', ...(Number(payment.received) > 0 ? { received: Number(payment.received) } : {}) },
       items,
     };
@@ -272,15 +282,66 @@ function useShop(engine, data, numbers, mode, showToast) {
 
   const resetDemo = useCallback(() => engine.resetLocal(), [engine]);
 
+  /* ── Loyal customers and delivery orders ── */
+  const customers = data.customers || [];
+  const orders = data.orders || [];
+
+  /** Adds or updates a customer. A new customer gets an id and a personal code. Returns the saved customer, or null when the phone number is not valid. */
+  const saveCustomer = useCallback((customer) => {
+    const existing = customer.id ? (current().customers || []).find((c) => c.id === customer.id) : null;
+    const phone = customer.phone !== undefined ? normalizePhone(customer.phone) : existing?.phone;
+    if (!phone) return null;
+    const sameNumber = !existing && (current().customers || []).find((c) => c.phone === phone);
+    const base = existing || sameNumber || null;
+    const fields = {
+      id: base?.id || `C${Date.now().toString(36)}${newCustomerCode()}`,
+      phone,
+      ...(customer.name !== undefined ? { name: text(customer.name, 80) } : {}),
+      ...(customer.loyal !== undefined ? { loyal: Boolean(customer.loyal) } : {}),
+      ...(customer.source !== undefined && !base ? { source: text(customer.source, 20) } : {}),
+      ...(customer.location !== undefined ? { location: customer.location } : {}),
+      ...(base?.code ? {} : { code: newCustomerCode() }),
+    };
+    engine.dispatch('customer.save', { customer: fields });
+    return (current().customers || []).find((c) => c.id === fields.id) || null;
+  }, [engine, current]);
+
+  const deleteCustomer = useCallback((id) => { engine.dispatch('customer.delete', { customerId: id }); }, [engine]);
+
+  /** The shop's WhatsApp number, location and delivery distance. */
+  const setShopDelivery = useCallback(({ phone, location, radiusKm }) => {
+    const patch = {};
+    if (phone !== undefined) patch.phone = normalizePhone(phone);
+    if (location !== undefined) patch.location = location ? { lat: Number(location.lat), lng: Number(location.lng) } : null;
+    if (radiusKm !== undefined) patch.radiusKm = Math.min(50, Math.max(0.5, Number(radiusKm) || 2));
+    engine.dispatch('shop.update', patch);
+  }, [engine]);
+
+  /** Turns a delivery order into a bill (what is in stock of it) and marks it accepted. */
+  const acceptOrder = useCallback((order, payment = { method: 'cash' }) => {
+    const res = checkout(order.items.map((i) => ({ productId: i.productId, qty: i.qty })), payment, { customer: { phone: order.phone, name: order.name } });
+    if (res.ok) {
+      engine.dispatch('order.update', { orderId: order.id, patch: { status: 'accepted', billId: res.bill.id } });
+      // Where the customer lives, so the loyal list can show how far away they are.
+      const known = (current().customers || []).find((c) => c.id === order.customerId);
+      if (known && order.location) engine.dispatch('customer.save', { customer: { id: known.id, location: order.location } });
+    }
+    return res;
+  }, [engine, checkout, current]);
+
+  const declineOrder = useCallback((order) => { engine.dispatch('order.update', { orderId: order.id, patch: { status: 'declined' } }); }, [engine]);
+
   return useMemo(() => ({
     products, sales, bills, purchaseOrders, invoices, stats, lowStockProducts, totalInventoryValue,
     nextBillNo: billNo(numbers.code, numbers.bill), shopName: data.shop.name, mode,
     byId, findByBarcode, findByCode, checkout, receiveStock, revertStock, addProduct, updateProduct,
     createPO, updatePO, deletePO, receivePO, setShopName, resetDemo,
+    customers, orders, shop: data.shop, saveCustomer, deleteCustomer, setShopDelivery, acceptOrder, declineOrder,
   }), [
     products, sales, bills, purchaseOrders, invoices, stats, lowStockProducts, totalInventoryValue, numbers.code, numbers.bill, data.shop.name, mode,
     byId, findByBarcode, findByCode, checkout, receiveStock, revertStock, addProduct, updateProduct,
     createPO, updatePO, deletePO, receivePO, setShopName, resetDemo,
+    customers, orders, data.shop, saveCustomer, deleteCustomer, setShopDelivery, acceptOrder, declineOrder,
   ]);
 }
 

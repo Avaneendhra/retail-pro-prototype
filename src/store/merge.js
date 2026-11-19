@@ -29,7 +29,7 @@ export function pruneBills(data, billsSince) {
 }
 
 /**
- * changes: { products, bills, purchaseOrders, invoices } as returned by POST /api/sync.
+ * changes: { products, bills, purchaseOrders, invoices, customers, orders } as returned by POST /api/sync.
  * Bills older than `billsSince` are not kept on the device (the server keeps them).
  */
 export function mergeChanges(data, changes, { billsSince = 0 } = {}) {
@@ -37,8 +37,11 @@ export function mergeChanges(data, changes, { billsSince = 0 } = {}) {
   const bills = mergeRows(data.bills, changes.bills, newestFirst('at'));
   const purchaseOrders = mergeRows(data.purchaseOrders, changes.purchaseOrders, newestFirst('createdAt'));
   const invoices = mergeRows(data.invoices, changes.invoices, newestFirst('at'));
+  const customers = mergeRows(data.customers || [], changes.customers, newestFirst('createdAt'));
+  const orders = mergeRows(data.orders || [], changes.orders, newestFirst('at'));
 
   const unchanged = products === data.products && bills === data.bills
-    && purchaseOrders === data.purchaseOrders && invoices === data.invoices;
-  return pruneBills(unchanged ? data : { ...data, products, bills, purchaseOrders, invoices }, billsSince);
+    && purchaseOrders === data.purchaseOrders && invoices === data.invoices
+    && customers === data.customers && orders === data.orders;
+  return pruneBills(unchanged ? data : { ...data, products, bills, purchaseOrders, invoices, customers, orders }, billsSince);
 }

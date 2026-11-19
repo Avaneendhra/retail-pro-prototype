@@ -6,7 +6,7 @@ import { useInventory } from '../../context/InventoryContext';
 import { LANGUAGES } from '../../i18n';
 import { pname } from '../../lib/format';
 import {
-  SellIcon, BillsIcon, StatsIcon, StockIcon, AddIcon, InvoiceIcon, OrdersIcon,
+  SellIcon, BillsIcon, StatsIcon, StockIcon, AddIcon, InvoiceIcon, OrdersIcon, CustomersIcon,
   BellIcon, GearIcon, SunIcon, MoonIcon, GlobeIcon, MenuIcon, CloseIcon,
 } from '../../lib/icons';
 import SettingsModal from './SettingsModal';
@@ -24,6 +24,7 @@ const NAV = [
   { path: '/add-stock', key: 'addStock', Icon: AddIcon },
   { path: '/invoices', key: 'invoices', Icon: InvoiceIcon },
   { path: '/orders', key: 'orders', Icon: OrdersIcon },
+  { path: '/customers', key: 'customers', Icon: CustomersIcon },
 ];
 // Phones get the five used every day; the rest sit behind the menu button.
 const TABS = ['/home', '/bills', '/add-stock', '/inventory', '/dashboard'];
@@ -115,7 +116,7 @@ function MoreSheet({ open, onClose, onSettings }) {
         <div className="more-links">
           {NAV.filter((n) => !TABS.includes(n.path)).map(({ path, key, Icon }) => (
             <NavLink key={path} to={path} onClick={onClose} className={({ isActive }) => `more-link ${isActive ? 'active' : ''}`}>
-              <Icon className="icon" /><span>{t(`nav.${key}`)}</span>
+              <Icon className="icon" /><span>{t(`nav.${key}`)}</span>{path === '/customers' && <NewOrders />}
             </NavLink>
           ))}
           <button className="more-link" onClick={() => { onClose(); onSettings(); }}><GearIcon className="icon" /><span>{t('topbar.settings')}</span></button>
@@ -130,6 +131,15 @@ function MoreSheet({ open, onClose, onSettings }) {
       </nav>
     </>
   );
+}
+
+/** How many delivery orders are waiting, next to Customers in the menu. */
+function NewOrders() {
+  const { t } = useTranslation();
+  const { orders } = useInventory();
+  const n = orders.filter((o) => o.status === 'new').length;
+  if (!n) return null;
+  return <span className="nav-count" aria-label={t('customers.newCount', { count: n })}>{n}</span>;
 }
 
 export default function AppShell() {
@@ -149,7 +159,7 @@ export default function AppShell() {
         <nav className="sidebar-nav" aria-label={t('nav.main')}>
           {NAV.map(({ path, key, Icon }) => (
             <NavLink key={path} to={path} title={t(`nav.${key}`)} className={({ isActive }) => `side-link ${isActive ? 'active' : ''}`}>
-              <Icon className="icon" /><span className="side-link-label">{t(`nav.${key}`)}</span>
+              <Icon className="icon" /><span className="side-link-label">{t(`nav.${key}`)}</span>{path === '/customers' && <NewOrders />}
             </NavLink>
           ))}
         </nav>

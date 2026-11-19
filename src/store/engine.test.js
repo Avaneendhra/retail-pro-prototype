@@ -50,7 +50,7 @@ function makeServer() {
   };
   const one = async (sql, args) => (await db.query(sql, args))[0];
   return {
-    db, clock, net, logs,
+    db, clock, net, logs, app,
     api: createApi('http://shop.test', fetchImpl),
     stock: async (id) => (await one('SELECT quantity FROM products WHERE id = ?', [id]))?.quantity,
     count: async (table) => (await one(`SELECT COUNT(*) AS n FROM ${table}`)).n,
@@ -227,7 +227,7 @@ it('signing up and keeping device data uploads products and bills, and a second 
   expect(await server.count('bills')).toBe(billsExpected);
   expect(b.view().account.device.no).toBe(2);
   expect(b.data()).toEqual(a.data());
-  expect(a.data().shop).toEqual({ name: 'Sri Lakshmi Stores' });
+  expect(a.data().shop).toEqual({ name: 'Sri Lakshmi Stores', phone: '', location: null, radiusKm: 2 });
 });
 
 it('after signing up with the device data, signing out shows a fresh sample shop, not a stale copy', async () => {
@@ -830,4 +830,35 @@ it('says when the device can only keep data in memory', async () => {
   await a.engine.start();
 
   expect(a.view().storage).toBe('memory');
+});
+
+/* ── quick delivery ───────────────────────────────────────────── */
+
+it("a loyal customer's order from their link arrives on the shop's device, and accepting it records the bill", async () => {
+  const server = makeServer();
+  const a = makeDevice(server);
+  await a.engine.start();
+  await a.engine.signUp({ ...OWNER, keepDeviceData: true });
+  a.engine.dispatch('customer.save', { customer: { id: 'C1', name: 'Ravi', phone: '9111111111', code: 'K7Q2M9XA', loyal: true, source: 'manual' } });
+  await a.engine.syncNow();
+
+  const sent = await server.app.request('/api/public/orders', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ shop: a.view().account.shop.id, code: 'K7Q2M9XA', name: 'Ravi', address: 'Flat 4', items: [{ productId: MILK.id, qty: 2 }] }),
+  });
+  await a.engine.syncNow();
+  const [order] = a.data().orders;
+
+  expect(sent.status).toBe(201);
+  expect(order).toMatchObject({ customerId: 'C1', name: 'Ravi', phone: '9111111111', status: 'new', address: 'Flat 4', items: [{ productId: MILK.id, qty: 2, price: MILK.price }] });
+
+  a.sell([[MILK.id, 2]]);
+  a.engine.dispatch('order.update', { orderId: order.id, patch: { status: 'accepted', billId: a.data().bills[0].id } });
+  await a.engine.syncNow();
+  const b = await secondDevice(server);
+
+  expect(a.view().sync).toMatchObject({ pending: 0, rejected: [] });
+  expect(b.data().orders[0]).toMatchObject({ status: 'accepted', billId: a.data().bills[0].id });
+  expect(b.data().customers).toEqual(a.data().customers);
 });

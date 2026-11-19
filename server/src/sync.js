@@ -33,7 +33,22 @@ const productRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {
 const billRow = (r) => ({
   id: r.id, billNo: r.bill_no, at: r.at, total: r.total, payment: parseJson(r.payment, {}), items: parseJson(r.items, []),
   deviceNo: r.device_no, userId: r.user_id, ...(r.seed ? { seed: true } : {}), ...(r.discount ? { discount: r.discount } : {}),
+  ...(r.customer ? { customer: parseJson(r.customer, null) } : {}),
 });
+
+const customerRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {
+  id: r.id, name: r.name, phone: r.phone, code: r.code, loyal: Boolean(r.loyal), source: r.source,
+  location: parseJson(r.location, null), createdAt: r.created_at,
+});
+
+const orderRow = (r) => ({
+  id: r.id, customerId: r.customer_id, name: r.name, phone: r.phone, items: parseJson(r.items, []),
+  address: r.address, note: r.note, location: parseJson(r.location, null), km: r.km, status: r.status,
+  ...(r.bill_id ? { billId: r.bill_id } : {}), at: r.at,
+});
+
+/** The shop as devices see it: name and delivery settings. */
+export const shopRow = (r) => ({ id: r.id, name: r.name, phone: r.phone || '', location: parseJson(r.location, null), radiusKm: r.radius_km ?? 2 });
 
 const poRow = (r) => (r.deleted ? { id: r.id, deleted: true } : {
   id: r.id, poNo: r.po_no, supplier: r.supplier, status: r.status, items: parseJson(r.items, []), createdAt: r.created_at,
@@ -57,6 +72,8 @@ function pullStatements(shopId, since, billsSince) {
     { sql: `SELECT * FROM bills WHERE shop_id = ?1 AND seq > ?2 AND at >= ?3 ${page}`, args: [shopId, since, billsSince] },
     { sql: `SELECT * FROM purchase_orders WHERE shop_id = ?1 AND seq > ?2 AND (deleted = 0 OR ?2 > 0) ${page}`, args: [shopId, since] },
     { sql: `SELECT * FROM invoices WHERE shop_id = ?1 AND seq > ?2 ${page}`, args: [shopId, since] },
+    { sql: `SELECT * FROM customers WHERE shop_id = ?1 AND seq > ?2 AND (deleted = 0 OR ?2 > 0) ${page}`, args: [shopId, since] },
+    { sql: `SELECT * FROM delivery_orders WHERE shop_id = ?1 AND seq > ?2 ${page}`, args: [shopId, since] },
   ];
 }
 
@@ -115,14 +132,14 @@ export function syncRoutes(app) {
     }
 
     const reads = [
-      { sql: 'SELECT id, name, seq FROM shops WHERE id = ?1', args: [user.shopId] },
+      { sql: 'SELECT id, name, seq, phone, location, radius_km FROM shops WHERE id = ?1', args: [user.shopId] },
       readDevice,
       ...pullStatements(user.shopId, body.since, body.billsSince),
     ];
     const results = await db.batch([...statements, ...reads]);
-    const [[shop], [device], products, bills, orders, invoices] = results.slice(-reads.length).map((r) => r.rows);
+    const [[shop], [device], products, bills, orders, invoices, customers, deliveries] = results.slice(-reads.length).map((r) => r.rows);
 
-    const cursor = safeCursor(shop.seq, [products, bills, orders, invoices]);
+    const cursor = safeCursor(shop.seq, [products, bills, orders, invoices, customers, deliveries]);
     const upTo = (rows) => rows.filter((r) => r.seq <= cursor);
     const token = at - c.get('tokenIssuedAt') >= TOKEN_REFRESH_MS
       ? await signToken({ userId: user.id, shopId: user.shopId, tokenVersion: user.tokenVersion }, config.jwtSecret, at)
@@ -138,8 +155,10 @@ export function syncRoutes(app) {
         bills: upTo(bills).map(billRow),
         purchaseOrders: upTo(orders).map(poRow),
         invoices: upTo(invoices).map(invoiceRow),
+        customers: upTo(customers).map(customerRow),
+        orders: upTo(deliveries).map(orderRow),
       },
-      shop: { id: shop.id, name: shop.name },
+      shop: shopRow(shop),
       user: { id: user.id, name: user.name, login: user.login, role: user.role },
       device: publicDevice(device),
       ...(token ? { token } : {}),

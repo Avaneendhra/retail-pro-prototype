@@ -27,7 +27,7 @@ function deepFreeze(value) {
 }
 
 it('starts empty', () => {
-  expect(emptyData()).toEqual({ products: [], bills: [], purchaseOrders: [], invoices: [], shop: { name: '' } });
+  expect(emptyData()).toEqual({ products: [], bills: [], purchaseOrders: [], invoices: [], customers: [], orders: [], shop: { name: '' } });
   expect(emptyDataset()).toEqual({ data: emptyData(), outbox: [], cursor: 0, counters: { bill: 1, po: 1, sku: 1 }, device: { id: null, no: 0 } });
 });
 
@@ -174,6 +174,46 @@ it('import skips ids that already exist', () => {
 
 it('shop.update renames the shop', () => {
   expect(applyOp(shop(), { id: 'op-1', type: 'shop.update', at: T, name: 'Lakshmi Kirana' }).shop).toEqual({ name: 'Lakshmi Kirana' });
+});
+
+it('shop.update also keeps the WhatsApp number, location and delivery distance, changing only what it is given', () => {
+  const data = applyOp(shop(), { id: 'op-1', type: 'shop.update', at: T, phone: '9876543210', location: { lat: 17.36, lng: 78.47 }, radiusKm: 2 });
+
+  expect(data.shop).toEqual({ name: '', phone: '9876543210', location: { lat: 17.36, lng: 78.47 }, radiusKm: 2 });
+  expect(applyOp(data, { id: 'op-2', type: 'shop.update', at: T, name: 'Lakshmi' }).shop).toMatchObject({ name: 'Lakshmi', phone: '9876543210', radiusKm: 2 });
+});
+
+const ravi = { id: 'C1', name: 'Ravi', phone: '9876543210', code: 'K7Q2M9XA', loyal: true, source: 'contacts', location: null, createdAt: T };
+
+it('customer.save adds a customer, and saving the same id again updates it', () => {
+  const added = applyOp(shop(), { id: 'op-1', type: 'customer.save', at: T, customer: ravi });
+  expect(added.customers).toEqual([ravi]);
+
+  const moved = applyOp(added, { id: 'op-2', type: 'customer.save', at: T, customer: { id: 'C1', location: { lat: 17.4, lng: 78.5 } } });
+  expect(moved.customers).toEqual([{ ...ravi, location: { lat: 17.4, lng: 78.5 } }]);
+});
+
+it('customer.delete removes the customer', () => {
+  const data = applyOp(shop(), { id: 'op-1', type: 'customer.save', at: T, customer: ravi });
+
+  expect(applyOp(data, { id: 'op-2', type: 'customer.delete', at: T, customerId: 'C1' }).customers).toEqual([]);
+  expect(applyOp(data, { id: 'op-3', type: 'customer.delete', at: T, customerId: 'C9' })).toBe(data);
+});
+
+it('order.update accepts or declines a delivery order once', () => {
+  const order = { id: 'O1', customerId: 'C1', name: 'Ravi', items: [{ productId: 'P1', name: 'Milk 500ml', qty: 2, price: 30 }], status: 'new', at: T };
+  const data = { ...shop(), orders: [order] };
+
+  const accepted = applyOp(data, { id: 'op-1', type: 'order.update', at: T, orderId: 'O1', patch: { status: 'accepted', billId: 'B7' } });
+
+  expect(accepted.orders[0]).toMatchObject({ status: 'accepted', billId: 'B7' });
+  expect(applyOp(accepted, { id: 'op-2', type: 'order.update', at: T, orderId: 'O1', patch: { status: 'declined' } })).toBe(accepted);
+});
+
+it('data saved before customers existed still takes customer changes', () => {
+  const { customers, orders, ...old } = shop();
+
+  expect(applyOp(old, { id: 'op-1', type: 'customer.save', at: T, customer: ravi }).customers).toEqual([ravi]);
 });
 
 it('an unknown change is ignored', () => {

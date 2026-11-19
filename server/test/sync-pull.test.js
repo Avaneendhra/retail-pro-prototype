@@ -6,7 +6,7 @@ const MILK = {
   id: 'P1', code: 'ML', barcode: '8901262010016', name: 'Milk 500ml', names: {}, aliases: [], category: 'dairy',
   price: 30, min: 20, coverDays: 2, quantity: 40, needsReview: false, createdAt: T0, batch: '', mfgDate: '', expiryDate: '',
 };
-const NOTHING = { products: [], bills: [], purchaseOrders: [], invoices: [] };
+const NOTHING = { products: [], bills: [], purchaseOrders: [], invoices: [], customers: [], orders: [] };
 const secondDevice = (app, deviceId = 'device-b') => login(app, { login: 'lakshmi@example.com', deviceId });
 const ids = (rows) => rows.map((r) => r.id);
 
@@ -19,7 +19,7 @@ test('the first sync returns every product and the cursor', async () => {
   assert.deepEqual(res.changes, { ...NOTHING, products: [MILK] });
   assert.equal(res.cursor, 1);
   assert.equal(res.more, false);
-  assert.deepEqual(res.shop, { id: owner.shop.id, name: 'Sri Lakshmi Stores' });
+  assert.deepEqual(res.shop, { id: owner.shop.id, name: 'Sri Lakshmi Stores', phone: '', location: null, radiusKm: 2 });
   assert.deepEqual(res.user, owner.user);
   assert.deepEqual(res.device, { id: 'device-a', no: 1, counters: {} });
   assert.deepEqual(res.accepted, []);

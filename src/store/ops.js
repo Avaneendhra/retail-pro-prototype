@@ -3,7 +3,7 @@
 // the two must stay in step. Everything here is pure: data in, new data out,
 // and the very same object back when nothing changed.
 
-export const emptyData = () => ({ products: [], bills: [], purchaseOrders: [], invoices: [], shop: { name: '' } });
+export const emptyData = () => ({ products: [], bills: [], purchaseOrders: [], invoices: [], customers: [], orders: [], shop: { name: '' } });
 
 export const emptyDataset = ({ device = { id: null, no: 0 }, counters = { bill: 1, po: 1, sku: 1 } } = {}) => ({
   data: emptyData(),
@@ -20,6 +20,9 @@ const PRODUCT_DEFAULTS = {
 const PRODUCT_KEYS = ['id', 'code', 'barcode', 'name', 'names', 'aliases', 'category', 'price', 'min', 'coverDays', 'quantity', 'needsReview', 'createdAt', 'batch', 'mfgDate', 'expiryDate'];
 const PRODUCT_PATCH_KEYS = ['name', 'names', 'aliases', 'code', 'barcode', 'category', 'price', 'min', 'coverDays', 'needsReview', 'batch', 'mfgDate', 'expiryDate'];
 const PO_PATCH_KEYS = ['supplier', 'status', 'items'];
+const CUSTOMER_KEYS = ['id', 'name', 'phone', 'code', 'loyal', 'source', 'location', 'createdAt'];
+const CUSTOMER_DEFAULTS = { name: '', phone: '', code: '', loyal: false, source: 'manual', location: null };
+const SHOP_KEYS = ['name', 'phone', 'location', 'radiusKm'];
 
 const pick = (source, keys) => {
   const out = {};
@@ -129,8 +132,31 @@ const HANDLERS = {
   },
 
   'shop.update'(data, op) {
-    if (data.shop.name === op.name) return data;
-    return { ...data, shop: { ...data.shop, name: op.name } };
+    const patch = pick(op, SHOP_KEYS);
+    if (Object.entries(patch).every(([key, value]) => JSON.stringify(data.shop[key]) === JSON.stringify(value))) return data;
+    return { ...data, shop: { ...data.shop, ...patch } };
+  },
+
+  // Customers who may order for delivery. Saving an id that exists updates it.
+  'customer.save'(data, op) {
+    const customers = data.customers || [];
+    const fields = pick(op.customer, CUSTOMER_KEYS);
+    if (has(customers, fields.id)) return { ...data, customers: replace(customers, fields.id, (c) => ({ ...c, ...fields })) };
+    return { ...data, customers: [{ ...CUSTOMER_DEFAULTS, createdAt: op.at, ...fields }, ...customers] };
+  },
+
+  'customer.delete'(data, op) {
+    const customers = data.customers || [];
+    if (!has(customers, op.customerId)) return data;
+    return { ...data, customers: customers.filter((c) => c.id !== op.customerId) };
+  },
+
+  // A delivery order is accepted (it became a bill) or declined, once.
+  'order.update'(data, op) {
+    const orders = data.orders || [];
+    const order = orders.find((o) => o.id === op.orderId);
+    if (!order || order.status !== 'new') return data;
+    return { ...data, orders: replace(orders, op.orderId, (o) => ({ ...o, ...pick(op.patch, ['status', 'billId']) })) };
   },
 
   // Rows this device had before it joined the shop. Imported bills do not move

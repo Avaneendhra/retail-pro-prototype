@@ -16,6 +16,7 @@ export const StockIcon = icon(['M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 
 export const AddIcon = icon(['M4 7V5a1 1 0 011-1h2', 'M17 4h2a1 1 0 011 1v2', 'M20 17v2a1 1 0 01-1 1h-2', 'M7 20H5a1 1 0 01-1-1v-2', 'M12 8v8', 'M8 12h8']);
 export const InvoiceIcon = icon(['M7 3h7l5 5v13H7z', 'M14 3v5h5', 'M10 13h6', 'M10 17h6']);
 export const OrdersIcon = icon(['M3 7h13v10H3z', 'M16 10h3l2 3v4h-5', 'M7 20a2 2 0 100-4 2 2 0 000 4z', 'M17 20a2 2 0 100-4 2 2 0 000 4z']);
+export const CustomersIcon = icon(['M9 11a4 4 0 100-8 4 4 0 000 8z', 'M2 21v-1a6 6 0 016-6h2a6 6 0 016 6v1', 'M16 3.5a4 4 0 010 7.5', 'M22 21v-1a6 6 0 00-4-5.6']);
 export const SearchIcon = icon(['M21 21l-5-5', 'M17 11a6 6 0 11-12 0 6 6 0 0112 0z']);
 export const ScanIcon = icon(['M4 7V5a1 1 0 011-1h2', 'M17 4h2a1 1 0 011 1v2', 'M20 17v2a1 1 0 01-1 1h-2', 'M7 20H5a1 1 0 01-1-1v-2', 'M8 8v8', 'M11 8v8', 'M14 8v8', 'M17 8v8']);
 export const MenuIcon = icon(['M4 7h16', 'M4 12h16', 'M4 17h16']);
