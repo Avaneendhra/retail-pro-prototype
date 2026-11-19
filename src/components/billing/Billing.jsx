@@ -12,6 +12,7 @@ import Modal from '../common/Modal';
 import Receipt from '../common/Receipt';
 import BarcodeScanModal from './BarcodeScanModal';
 import InstallBanner from '../layout/InstallBanner';
+import { normalizePhone } from '../../lib/customers';
 
 const HELD_KEY = 'stokd_held_bills';
 const loadHeld = () => { try { return JSON.parse(localStorage.getItem(HELD_KEY) || '[]'); } catch { return []; } };
@@ -29,7 +30,7 @@ function parseEntry(raw) {
 
 export default function Billing() {
   const { t } = useTranslation();
-  const { products, sales, bills, nextBillNo, shopName, byId, findByCode, findByBarcode, checkout } = useInventory();
+  const { products, sales, bills, nextBillNo, shopName, byId, findByCode, findByBarcode, checkout, customers } = useInventory();
   const { showToast } = useToast();
 
   const [cart, setCart] = useState([]);              // [{ productId, qty }]
@@ -39,6 +40,7 @@ export default function Billing() {
   const [method, setMethod] = useState('cash');
   const [received, setReceived] = useState('');
   const [discount, setDiscount] = useState(null);    // null, or { mode: 'amount' | 'pct', value: '' }
+  const [customerPhone, setCustomerPhone] = useState(null); // null, or what is typed
   const [held, setHeld] = useState(loadHeld);
   const [heldOpen, setHeldOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false); // the bill, on phones
@@ -130,10 +132,14 @@ export default function Billing() {
   const receivedNum = Number(received) || 0;
   const change = receivedNum - total;
 
-  const resetBill = () => { setCart([]); setReceived(''); setDiscount(null); setQuery(''); };
+  const resetBill = () => { setCart([]); setReceived(''); setDiscount(null); setCustomerPhone(null); setQuery(''); };
+
+  // The customer's phone, optional: it is how frequent buyers are found for the loyal list.
+  const typedPhone = normalizePhone(customerPhone);
+  const knownCustomer = typedPhone ? customers.find((c) => c.phone === typedPhone) : null;
 
   const pay = () => {
-    const res = checkout(cart, { method, received: method === 'cash' && receivedNum ? receivedNum : null }, { discount: off });
+    const res = checkout(cart, { method, received: method === 'cash' && receivedNum ? receivedNum : null }, { discount: off, customer: knownCustomer ? { phone: knownCustomer.phone, name: knownCustomer.name } : { phone: customerPhone } });
     if (!res.ok) { showToast(res.error, 'error'); return; }
     setResult(res);
     setSheetOpen(false);
@@ -281,8 +287,21 @@ export default function Billing() {
               </div>
               <button className="icon-btn" onClick={() => setDiscount(null)} aria-label={t('sell.removeDiscount')}><CloseIcon /></button>
             </div>
-          ) : (
-            <button className="text-btn" onClick={() => setDiscount({ mode: 'amount', value: '' })} disabled={!lines.length}>{t('sell.addDiscount')}</button>
+          ) : null}
+          {customerPhone !== null && (
+            <div className="discount-row">
+              <label htmlFor="bill-customer">{t('customers.phoneShort')}</label>
+              <input id="bill-customer" className="form-input" inputMode="tel" autoComplete="off" value={customerPhone} autoFocus placeholder="98765 43210"
+                onChange={(e) => setCustomerPhone(e.target.value.replace(/[^\d +-]/g, '').slice(0, 16))} />
+              <span className="text-sm text-[var(--text-secondary)] truncate min-w-0">{knownCustomer ? (knownCustomer.name || t('customers.known')) : ''}</span>
+              <button className="icon-btn" onClick={() => setCustomerPhone(null)} aria-label={t('customers.removePhone')}><CloseIcon /></button>
+            </div>
+          )}
+          {(!discount || customerPhone === null) && (
+            <div className="flex flex-wrap gap-x-1">
+              {!discount && <button className="text-btn" onClick={() => setDiscount({ mode: 'amount', value: '' })} disabled={!lines.length}>{t('sell.addDiscount')}</button>}
+              {customerPhone === null && <button className="text-btn" onClick={() => setCustomerPhone('')} disabled={!lines.length}>{t('customers.addPhone')}</button>}
+            </div>
           )}
 
           {off > 0 && (

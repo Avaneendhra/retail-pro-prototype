@@ -61,7 +61,7 @@ test('migrate applies each file once', () => {
   const first = migrate(db, MIGRATIONS);
   const second = migrate(db, MIGRATIONS);
 
-  assert.deepEqual(first, ['0001_init.sql', '0002_bill_discount.sql', '0003_product_dates.sql']);
+  assert.deepEqual(first, ['0001_init.sql', '0002_bill_discount.sql', '0003_product_dates.sql', '0004_customers_orders.sql']);
   assert.deepEqual(second, []);
 });
 
@@ -71,5 +71,5 @@ test('the schema has every table the app needs', async () => {
 
   const tables = (await db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '\\_%' ESCAPE '\\' ORDER BY name")).map(r => r.name);
 
-  assert.deepEqual(tables, ['auth_attempts', 'bills', 'devices', 'invoices', 'ops', 'products', 'purchase_orders', 'shops', 'users']);
+  assert.deepEqual(tables, ['auth_attempts', 'bills', 'customers', 'delivery_orders', 'devices', 'invoices', 'ops', 'products', 'purchase_orders', 'shops', 'users']);
 });

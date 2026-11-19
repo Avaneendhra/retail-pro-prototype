@@ -260,7 +260,11 @@ export function createEngine({
     const stillAcked = res.more ? outbox.filter((op) => acked.has(op.id)).map((op) => op.id) : [];
 
     let base = mergeChanges(before.data, res.changes || {}, { billsSince: billsSince() });
-    if (res.shop?.name != null && base.shop.name !== res.shop.name) base = { ...base, shop: { ...base.shop, name: res.shop.name } };
+    if (res.shop) {
+      // The shop's name and delivery settings as the server has them.
+      const shopFields = Object.fromEntries(['name', 'phone', 'location', 'radiusKm'].filter((k) => res.shop[k] !== undefined).map((k) => [k, res.shop[k]]));
+      if (Object.entries(shopFields).some(([k, v]) => JSON.stringify(base.shop[k]) !== JSON.stringify(v))) base = { ...base, shop: { ...base.shop, ...shopFields } };
+    }
 
     const deviceNo = res.device?.no ?? before.device.no;
     const counters = maxCounters(dataset.counters, res.device?.counters);

@@ -38,6 +38,7 @@ const Inventory = lazyPage(() => import("./components/inventory/Inventory"));
 const AddStock = lazyPage(() => import("./components/inventory/AddStock"));
 const SupplierInvoice = lazyPage(() => import("./components/invoice/SupplierInvoice"));
 const PurchaseOrders = lazyPage(() => import("./components/orders/PurchaseOrders"));
+const Customers = lazyPage(() => import("./components/customers/Customers"));
 
 const router = createHashRouter([
   {
@@ -52,6 +53,7 @@ const router = createHashRouter([
       { path: "/add-stock", element: <AddStock /> },
       { path: "/invoices", element: <SupplierInvoice /> },
       { path: "/orders", element: <PurchaseOrders /> },
+      { path: "/customers", element: <Customers /> },
       // old routes
       { path: "/sell", element: <Navigate to="/home" replace /> },
       { path: "/invoice", element: <Navigate to="/invoices" replace /> },
@@ -60,14 +62,24 @@ const router = createHashRouter([
   },
 ]);
 
+// A customer's order link opens its own small page: no shop data, no sign-in.
+const OrderPage = React.lazy(() => import("./components/order/OrderPage"));
+const isOrderLink = window.location.hash.startsWith("#/order/");
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ToastProvider>
-      <InventoryProvider>
-        <ThemeProvider>
-          <RouterProvider router={router} />
-        </ThemeProvider>
-      </InventoryProvider>
-    </ToastProvider>
+    {isOrderLink ? (
+      <ThemeProvider>
+        <React.Suspense fallback={null}><OrderPage /></React.Suspense>
+      </ThemeProvider>
+    ) : (
+      <ToastProvider>
+        <InventoryProvider>
+          <ThemeProvider>
+            <RouterProvider router={router} />
+          </ThemeProvider>
+        </InventoryProvider>
+      </ToastProvider>
+    )}
   </React.StrictMode>
 );

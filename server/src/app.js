@@ -5,6 +5,7 @@ import { HttpError } from './errors.js';
 import { authRoutes } from './auth.js';
 import { syncRoutes } from './sync.js';
 import { teamRoutes } from './team.js';
+import { deliveryRoutes } from './delivery.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -51,6 +52,7 @@ export function createApp(resolve) {
   authRoutes(app);
   syncRoutes(app);
   teamRoutes(app);
+  deliveryRoutes(app);
 
   return app;
 }

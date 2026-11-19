@@ -65,6 +65,10 @@ const BillItem = z.object({
   total: Money,
 });
 
+const Phone = z.string().regex(/^\d{10}$/, 'Use a 10-digit mobile number.');
+const Place = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
+export const CustomerCode = z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/);
+
 const Bill = z.object({
   id: Id,
   billNo: z.string().min(1).max(24),
@@ -74,6 +78,19 @@ const Bill = z.object({
   items: z.array(BillItem).min(1).max(200),
   discount: Money.optional(),
   seed: z.boolean().optional(),
+  customer: z.object({ phone: Phone, name: z.string().trim().max(80).optional() }).optional(),
+});
+
+// A new customer needs a phone and a code; saving an id that exists may send only what changed.
+const Customer = z.object({
+  id: Id,
+  name: z.string().trim().max(80).optional(),
+  phone: Phone.optional(),
+  code: CustomerCode.optional(),
+  loyal: z.boolean().optional(),
+  source: z.string().max(20).optional(),
+  location: Place.nullable().optional(),
+  createdAt: Time.optional(),
 });
 
 const PoItem = z.object({ productId: Id, qty: z.number().int().min(1).max(1e6) });
@@ -132,7 +149,15 @@ const SCHEMAS = new Map([
   ['po.update', op('po.update', { poId: Id, patch: PoPatch })],
   ['po.receive', op('po.receive', { poId: Id, lines: StockLines, changes: z.array(StockChange).max(200).optional() })],
   ['po.delete', op('po.delete', { poId: Id })],
-  ['shop.update', op('shop.update', { name: z.string().trim().min(1).max(80) })],
+  ['shop.update', op('shop.update', {
+    name: z.string().trim().min(1).max(80).optional(),
+    phone: z.union([Phone, z.literal('')]).optional(),
+    location: Place.nullable().optional(),
+    radiusKm: z.number().min(0.5).max(50).optional(),
+  }).refine((o) => ['name', 'phone', 'location', 'radiusKm'].some((k) => o[k] !== undefined), { message: 'Nothing to change.' })],
+  ['customer.save', op('customer.save', { customer: Customer })],
+  ['customer.delete', op('customer.delete', { customerId: Id })],
+  ['order.update', op('order.update', { orderId: Id, patch: z.object({ status: z.enum(['accepted', 'declined']), billId: Id.optional() }) })],
   ['import', op('import', {
     products: z.array(Product).default([]),
     bills: z.array(Bill).default([]),
@@ -193,9 +218,10 @@ const productStatement = (ctx, products) => insertRows(
 
 const billStatement = (ctx, bills) => insertRows(
   ctx, 'bills',
-  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed', 'discount'],
+  ['id', 'bill_no', 'at', 'total', 'payment', 'items', 'seed', 'discount', 'customer'],
   bills.map((b) => ({
     id: b.id, bill_no: b.billNo, at: b.at, total: b.total, payment: JSON.stringify(b.payment), items: JSON.stringify(b.items), seed: b.seed ? 1 : 0, discount: b.discount || 0,
+    customer: b.customer ? JSON.stringify(b.customer) : null,
   })),
   [['user_id', '?4'], ['device_no', '(SELECT device_no FROM devices WHERE shop_id = ?1 AND id = ?5)']], [ctx.userId, ctx.deviceId],
 );
@@ -301,8 +327,39 @@ const EFFECTS = {
   }],
 
   'shop.update': (o, ctx) => [{
-    sql: `UPDATE shops SET name = ?3 WHERE id = ?1 AND ${GUARD}`,
-    args: [ctx.shopId, ctx.opId, o.name],
+    sql: `UPDATE shops SET name = COALESCE(?3, name), phone = COALESCE(?4, phone),
+            location = CASE WHEN ?6 = 1 THEN ?5 ELSE location END, radius_km = COALESCE(?7, radius_km)
+          WHERE id = ?1 AND ${GUARD}`,
+    args: [ctx.shopId, ctx.opId, o.name ?? null, o.phone ?? null, o.location ? JSON.stringify(o.location) : null, o.location !== undefined ? 1 : 0, o.radiusKm ?? null],
+  }],
+
+  // A new customer is added only with a phone and a code; an existing one gets only the fields sent.
+  'customer.save': (o, ctx) => {
+    const c = o.customer;
+    return [{
+      sql: `INSERT INTO customers (shop_id, id, name, phone, code, loyal, source, location, created_at, seq)
+            SELECT ?1, ?3, COALESCE(?4, ''), COALESCE(?5, ''), COALESCE(?6, ''), COALESCE(?7, 1), COALESCE(?8, 'manual'), ?9, ?10, ${SEQ}
+            WHERE ${GUARD} AND ((?5 IS NOT NULL AND ?6 IS NOT NULL) OR EXISTS (SELECT 1 FROM customers WHERE shop_id = ?1 AND id = ?3))
+            ON CONFLICT (shop_id, id) DO UPDATE SET
+              name = COALESCE(?4, name), phone = COALESCE(?5, phone), code = COALESCE(?6, code), loyal = COALESCE(?7, loyal),
+              location = CASE WHEN ?11 = 1 THEN ?9 ELSE location END, deleted = 0, seq = excluded.seq`,
+      args: [
+        ctx.shopId, ctx.opId, c.id, c.name ?? null, c.phone ?? null, c.code ?? null, c.loyal === undefined ? null : flag(c.loyal),
+        c.source ?? null, c.location ? JSON.stringify(c.location) : null, c.createdAt ?? o.at, c.location !== undefined ? 1 : 0,
+      ],
+    }];
+  },
+
+  'customer.delete': (o, ctx) => [{
+    sql: `UPDATE customers SET deleted = 1, seq = ${SEQ} WHERE shop_id = ?1 AND id = ?3 AND deleted = 0 AND ${GUARD}`,
+    args: [ctx.shopId, ctx.opId, o.customerId],
+  }],
+
+  // A delivery order is answered once.
+  'order.update': (o, ctx) => [{
+    sql: `UPDATE delivery_orders SET status = ?4, bill_id = COALESCE(?5, bill_id), seq = ${SEQ}
+          WHERE shop_id = ?1 AND id = ?3 AND status = 'new' AND ${GUARD}`,
+    args: [ctx.shopId, ctx.opId, o.orderId, o.patch.status, o.patch.billId ?? null],
   }],
 
   // Rows a device had before it joined the shop. Imported bills never move stock:

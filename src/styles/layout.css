@@ -375,3 +375,21 @@
 .insight-bar-col span { font-size: 10px; line-height: 14px; color: var(--text-muted); margin-top: 3px; }
 .insight-bar-col span.is-today { color: var(--text-primary); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .insight-split { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+/* A small count beside a menu item (new delivery orders). */
+.nav-count {
+  margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
+}
+
+/* ── The customer's order page ── */
+.order-page { max-width: 560px; margin: 0 auto; padding: 20px 16px 200px; min-height: 100dvh; }
+.order-stepper { display: inline-flex; align-items: center; gap: 2px; border-radius: 999px; background: var(--surface-2); }
+.order-stepper button { width: 40px; height: 40px; border-radius: 999px; font-size: 20px; font-weight: 600; color: var(--text-primary); }
+.order-stepper button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.order-stepper span { min-width: 22px; text-align: center; font-weight: 700; }
+.order-foot {
+  position: fixed; left: 0; right: 0; bottom: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.order-foot-inner { max-width: 528px; margin: 0 auto; }
