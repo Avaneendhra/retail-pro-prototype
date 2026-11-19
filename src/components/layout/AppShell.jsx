@@ -11,6 +11,7 @@ import {
 } from '../../lib/icons';
 import SettingsModal from './SettingsModal';
 import StorageNotice from './StorageNotice';
+import DesktopSiteNotice from './DesktopSiteNotice';
 import AccountButton from '../account/AccountButton';
 import Logo from './Logo';
 
@@ -177,6 +178,7 @@ export default function AppShell() {
       </header>
 
       <main className="main">
+        <DesktopSiteNotice />
         <StorageNotice />
         <Outlet />
       </main>

@@ -347,3 +347,31 @@
 @media (prefers-reduced-motion: reduce) {
   .more-sheet, .cart-bar, .bill { animation: none; transition: none; }
 }
+
+/* ── Dashboard tips: picture, reason and a small chart ── */
+.insight-row {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 14px; row-gap: 12px;
+  align-items: start; padding: 16px 0;
+}
+.insight-chart-cell { grid-column: 1 / -1; }
+@media (min-width: 640px) {
+  .insight-row { grid-template-columns: 48px minmax(0, 1fr) 196px; column-gap: 18px; align-items: center; }
+  .insight-chart-cell { grid-column: auto; }
+}
+.insight-tile {
+  position: relative; width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2);
+  display: grid; place-items: center; font-weight: 700; font-size: 18px; color: var(--text-secondary);
+}
+@media (min-width: 640px) { .insight-tile { width: 48px; height: 48px; } }
+.insight-tile img { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; background: #fff; padding: 3px; }
+.insight-tile i { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--surface); }
+.insight-chart { margin: 0; }
+.insight-chart figcaption { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.insight-bars { display: flex; align-items: flex-end; gap: 4px; height: 64px; }
+.insight-bars.is-dense { gap: 2px; height: 48px; }
+.insight-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; min-width: 0; }
+.insight-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.insight-bar { width: 100%; border-radius: 4px 4px 1px 1px; }
+.insight-bar-col span { font-size: 10px; line-height: 14px; color: var(--text-muted); margin-top: 3px; }
+.insight-bar-col span.is-today { color: var(--text-primary); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.insight-split { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-top: 4px; }

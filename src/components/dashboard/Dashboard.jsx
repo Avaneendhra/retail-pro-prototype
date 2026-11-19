@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useInventory } from '../../context/InventoryContext';
 import { useToast } from '../../context/ToastContext';
-import { businessSummary, startOfDay } from '../../lib/insights';
+import { businessSummary, startOfDay, weekdayPatterns } from '../../lib/insights';
+import { loadProductList } from '../../lib/productList';
+import InsightRow from './InsightRow';
 import { inr, pname, weekdayShort, fmtTime, fmtDate } from '../../lib/format';
 import PageHeader from '../layout/PageHeader';
 import { expiryInfo } from '../../lib/expiry';
@@ -55,6 +57,22 @@ export default function Dashboard() {
       ? { key: 'insight.expired', productId: p.id, tone: 'danger' }
       : { key: 'insight.expiresSoon', productId: p.id, tone: 'warning', params: { count: info.days } }));
   const insights = [...expiring, ...sum.insights];
+  const patterns = useMemo(() => weekdayPatterns(sales), [sales]);
+
+  // Pictures for the tips, from the product list, for products whose barcode it knows.
+  const [pictures, setPictures] = useState({});
+  const tipCodes = insights.map((ins) => byId(ins.productId)?.barcode).filter(Boolean).join(',');
+  useEffect(() => {
+    if (!tipCodes) return undefined;
+    let gone = false;
+    loadProductList().then((list) => {
+      if (gone || !list) return;
+      const found = {};
+      for (const code of tipCodes.split(',')) { const image = list.findByBarcode(code)?.image; if (image) found[code] = image; }
+      setPictures(found);
+    });
+    return () => { gone = true; };
+  }, [tipCodes]);
 
   const toneDot = { danger: 'bg-[var(--danger)]', warning: 'bg-[var(--warning)]', info: 'bg-[var(--accent-blue)]', muted: 'bg-[var(--text-muted)]' };
   const daysText = (d) => (d < 1 ? t('dashboard.todayShort') : t('dashboard.inDays', { n: Math.max(1, Math.round(d)) }));
@@ -98,18 +116,16 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] gap-4 mb-4">
         <div className="card p-6 sm:p-7">
           <span className="eyebrow">{t('dashboard.insights')}</span>
-          <ul className="mt-6 divide-y divide-[var(--border)]">
+          <ul className="mt-4 divide-y divide-[var(--border)]">
             {insights.length === 0 && <li className="py-4 text-[var(--text-secondary)]">{t('dashboard.noInsights')}</li>}
             {insights.map((ins, i) => {
               const p = byId(ins.productId);
               return (
-                <li key={i}>
-                  <Link to={`/inventory?focus=${ins.productId}`} className="flex items-center gap-4 py-4 group">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${toneDot[ins.tone]}`} />
-                    <span className="flex-1 text-[17px] leading-snug">{t(ins.key, { name: pname(p), ...ins.params })}</span>
-                    <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)]">→</span>
-                  </Link>
-                </li>
+                <InsightRow
+                  key={i} insight={ins} product={p} stats={p && stats[p.id]} pattern={p && patterns[p.id]}
+                  picture={p?.barcode ? pictures[p.barcode] : ''} toneClass={toneDot[ins.tone]}
+                  text={{ name: pname(p), headline: t(ins.key, { name: pname(p), ...ins.params }) }}
+                />
               );
             })}
           </ul>

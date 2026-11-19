@@ -13,6 +13,10 @@ import AppShell from "./components/layout/AppShell";
 import Billing from "./components/billing/Billing";
 import { Splash } from "./components/layout/StartScreens";
 import { registerSW } from "virtual:pwa-register";
+import { fitPhoneScreen } from "./lib/desktopSite";
+
+// A phone browser set to "Desktop site" is asked to use the phone layout anyway.
+fitPhoneScreen();
 
 // A new version is installed and shown straight away (the page reloads once),
 // and an app left open checks for one every hour.
