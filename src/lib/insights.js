@@ -134,3 +134,39 @@ export function businessSummary(products, sales, stats, now = Date.now()) {
     fast, slow, runOut, lowStock, replenish, insights,
   };
 }
+
+/**
+ * Which days of the week each product sells most, from the four weeks before
+ * today (today is left out because it is not over yet). For each product:
+ * - avg: units sold on an average Monday … Sunday (index 0 = Monday)
+ * - peaks: the busiest days, at least 15% above the product's daily average, best first (at most 2)
+ * - today: today's index, so the screen can say "today is one of its busiest days"
+ * A shop with less history is averaged over the days it actually has.
+ */
+export function weekdayPatterns(sales, now = Date.now(), weeks = 4) {
+  const today = startOfDay(0, now);
+  const firstSale = sales.reduce((min, s) => Math.min(min, s.date), Infinity);
+  const from = Math.max(today - weeks * 7 * DAY, startOfDay(0, firstSale));
+  const weekdayOf = (time) => (new Date(time).getDay() + 6) % 7;
+
+  // How many Mondays, Tuesdays … the window holds.
+  const daysSeen = new Array(7).fill(0);
+  for (let t = from; t < today; t = startOfDay(-1, t + DAY / 2)) daysSeen[weekdayOf(t)] += 1;
+
+  const totals = {};
+  for (const s of sales) {
+    if (s.date < from || s.date >= today) continue;
+    (totals[s.productId] ??= new Array(7).fill(0))[weekdayOf(s.date)] += s.qty;
+  }
+
+  const out = {};
+  for (const [productId, sold] of Object.entries(totals)) {
+    const avg = sold.map((n, i) => (daysSeen[i] ? Math.round((n / daysSeen[i]) * 10) / 10 : 0));
+    const seen = avg.filter((_, i) => daysSeen[i]);
+    const mean = seen.reduce((a, b) => a + b, 0) / Math.max(1, seen.length);
+    const peaks = avg.map((v, i) => [v, i]).filter(([v]) => v > 0 && v >= mean * 1.15)
+      .sort((a, b) => b[0] - a[0] || a[1] - b[1]).slice(0, 2).map(([, i]) => i);
+    out[productId] = { avg, peaks, today: weekdayOf(today) };
+  }
+  return out;
+}
