@@ -71,8 +71,14 @@ export function createSupabaseApi(clientOrPromise) {
   };
 }
 
+/** Which sign-in methods the project has switched on, e.g. { google: false, email: true }. */
+async function enabledProviders() {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+  return (await res.json()).external || {};
+}
+
 /** Sign-in actions. Every failure is an ApiError; `appUrl` is where Supabase sends people back to. */
-export function createSupabaseAuth(clientOrPromise, appUrl = () => `${window.location.origin}${window.location.pathname}`) {
+export function createSupabaseAuth(clientOrPromise, appUrl = () => `${window.location.origin}${window.location.pathname}`, providers = enabledProviders) {
   const client = () => Promise.resolve(clientOrPromise);
   const run = async (work) => {
     let res;
@@ -91,7 +97,12 @@ export function createSupabaseAuth(clientOrPromise, appUrl = () => `${window.loc
       const { data } = (await client()).auth.onAuthStateChange((event, session) => fn(event, session));
       return () => data.subscription.unsubscribe();
     },
-    google: () => run((c) => c.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: appUrl() } })),
+    google: async () => {
+      // Going to Google leaves the app; with Google off, Supabase would show only a raw error page.
+      const on = await providers().then((p) => p.google !== false, () => true);
+      if (!on) throw new ApiError(400, 'provider_disabled', 'Google sign-in is not switched on.');
+      return run((c) => c.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: appUrl() } }));
+    },
     signInEmail: (email, password) => run((c) => c.auth.signInWithPassword({ email: email.trim(), password })),
     signUpEmail: async (email, password) => {
       const data = await run((c) => c.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: appUrl() } }));
